@@ -114,7 +114,13 @@
   .ebtn { padding:6px 12px; border-radius:7px; font-size:12px; background:#fff;
           border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
   .ecanvas-wrap { display:flex; justify-content:center; background:#2B2A24;
-                  border-radius:10px; padding:8px; margin-bottom:6px; }
+                  border-radius:10px; padding:8px; margin-bottom:6px; position:relative; }
+  .elive { position:absolute; margin:0; padding:0 2px; background:transparent;
+           border:1px dashed rgba(25,113,194,.9); border-radius:3px;
+           outline:none; resize:none; overflow:hidden; white-space:pre;
+           font-weight:bold; line-height:1.25; z-index:5;
+           font-family:'Hiragino Sans','Yu Gothic',sans-serif;
+           caret-color:#1971C2; }
   .ehint { font-size:11px; color:#8A8371; margin:0 0 10px; }
   #ecanvas { max-width:100%; touch-action:none; border-radius:6px; cursor:crosshair; }
   .eactions { display:flex; gap:8px; }
@@ -402,7 +408,7 @@ function annotateImage(src, existing) {
           '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
         '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
-        '<p class="ehint">白い余白にも書き込めます。書いたものをタップすると選択され、そのままドラッグで移動、四隅の丸をドラッグで大きさ変更。文字はダブルタップで書き直せます。</p>' +
+        '<p class="ehint">白い余白にも書き込めます。「文字」で画像をタップするとその場で入力できます(Enterで確定)。タップで選択 → ドラッグで移動、青い丸で大きさ、緑の丸で回転。文字はもう一度タップで書き直せます。</p>' +
         '<div class="eactions">' +
           '<button class="btn" id="ecancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>' +
           '<button class="btn" id="edone" style="background:#3F7D4A">この内容で登録</button>' +
@@ -469,13 +475,16 @@ function annotateImage(src, existing) {
       ctx.restore();
       const all = active ? strokes.concat([active]) : strokes;
       all.forEach((s, i) => {
+        if (s.hidden) return;              // being retyped in the live box
         drawShape(s);
         if (i === sel && !active) outline(s);
       });
     }
 
     // Bounding box of a mark, used for selection and the highlight ring.
-    function bbox(s) {
+    // Box of a mark ignoring rotation ("local" space). Everything is stored
+    // unrotated plus a rot angle, so this is the shape's own frame.
+    function localBox(s) {
       if (s.type === "text") {
         const fs = Math.max(16, s.size * 4);
         const lines = String(s.text).split("\n");
@@ -487,57 +496,111 @@ function annotateImage(src, existing) {
         x2:Math.max(s.x1, s.x2), y2:Math.max(s.y1, s.y2)
       };
     }
+    function centreOf(s) {
+      const b = localBox(s);
+      return { x:(b.x1 + b.x2) / 2, y:(b.y1 + b.y2) / 2 };
+    }
+    // Convert between screen space and the mark's own rotated frame.
+    function toWorld(pt, s) {
+      const r = s.rot || 0;
+      if (!r) return { x:pt.x, y:pt.y };
+      const c0 = centreOf(s), cos = Math.cos(r), sin = Math.sin(r);
+      const dx = pt.x - c0.x, dy = pt.y - c0.y;
+      return { x:c0.x + dx*cos - dy*sin, y:c0.y + dx*sin + dy*cos };
+    }
+    function toLocal(pt, s) {
+      const r = s.rot || 0;
+      if (!r) return { x:pt.x, y:pt.y };
+      const c0 = centreOf(s), cos = Math.cos(-r), sin = Math.sin(-r);
+      const dx = pt.x - c0.x, dy = pt.y - c0.y;
+      return { x:c0.x + dx*cos - dy*sin, y:c0.y + dx*sin + dy*cos };
+    }
+    // Kept for callers that just want the unrotated box.
+    function bbox(s) { return localBox(s); }
 
-    const HPAD = 8;      // gap between a mark and its selection ring
-    const HR = 11;       // radius of the corner grab handles
+    // The canvas is drawn at full image resolution but displayed shrunk to fit
+    // the screen, so handle sizes are converted from on-screen pixels into
+    // canvas pixels. Otherwise the grab targets end up far too small to hit.
+    function dscale() {
+      const r = canvas.getBoundingClientRect();
+      return r.width ? canvas.width / r.width : 1;
+    }
+    function HPADv() { return 10 * dscale(); }   // gap between mark and ring
+    function HRv() { return 16 * dscale(); }     // drawn radius of a handle
+    function HITv() { return 30 * dscale(); }    // finger-friendly grab radius
 
     // Corner positions of the selection ring, used both for drawing the
     // handles and for working out whether a touch grabbed one.
+    // Handle positions in screen space (corners for resizing, plus one grip
+    // above the mark for rotating).
     function handles(s) {
-      const b = bbox(s);
-      return [
-        { id:"tl", x:b.x1 - HPAD, y:b.y1 - HPAD },
-        { id:"tr", x:b.x2 + HPAD, y:b.y1 - HPAD },
-        { id:"bl", x:b.x1 - HPAD, y:b.y2 + HPAD },
-        { id:"br", x:b.x2 + HPAD, y:b.y2 + HPAD }
+      const b = localBox(s), g = HPADv();
+      const local = [
+        { id:"tl", x:b.x1 - g, y:b.y1 - g },
+        { id:"tr", x:b.x2 + g, y:b.y1 - g },
+        { id:"bl", x:b.x1 - g, y:b.y2 + g },
+        { id:"br", x:b.x2 + g, y:b.y2 + g },
+        { id:"rot", x:(b.x1 + b.x2) / 2, y:b.y1 - g - 34 * dscale() }
       ];
+      return local.map(h => {
+        const w = toWorld(h, s);
+        return { id:h.id, x:w.x, y:w.y };
+      });
     }
 
     function outline(s) {
-      const b = bbox(s);
+      const b = localBox(s), g = HPADv(), r = HRv(), k = dscale();
+      const c0 = centreOf(s);
       ctx.save();
+      if (s.rot) {
+        ctx.translate(c0.x, c0.y);
+        ctx.rotate(s.rot);
+        ctx.translate(-c0.x, -c0.y);
+      }
       ctx.strokeStyle = "#1971C2";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(b.x1 - HPAD, b.y1 - HPAD, (b.x2 - b.x1) + HPAD*2, (b.y2 - b.y1) + HPAD*2);
+      ctx.lineWidth = 2 * k;
+      ctx.setLineDash([6 * k, 4 * k]);
+      ctx.strokeRect(b.x1 - g, b.y1 - g, (b.x2 - b.x1) + g*2, (b.y2 - b.y1) + g*2);
       ctx.setLineDash([]);
+      ctx.beginPath();                       // stem up to the rotate grip
+      ctx.moveTo((b.x1 + b.x2) / 2, b.y1 - g);
+      ctx.lineTo((b.x1 + b.x2) / 2, b.y1 - g - 34 * k);
+      ctx.stroke();
+      ctx.restore();
+
       for (const h of handles(s)) {
+        const isRot = h.id === "rot";
         ctx.beginPath();
-        ctx.arc(h.x, h.y, HR, 0, Math.PI * 2);
+        ctx.arc(h.x, h.y, isRot ? r * 1.05 : r, 0, Math.PI * 2);
+        ctx.fillStyle = isRot ? "#2F9E44" : "#1971C2";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, r * 0.45, 0, Math.PI * 2);
         ctx.fillStyle = "#FFFFFF";
         ctx.fill();
-        ctx.strokeStyle = "#1971C2";
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
       }
-      ctx.restore();
     }
 
     function hitTest(p) {
+      const pad = 12 * dscale();
       for (let i = strokes.length - 1; i >= 0; i--) {
-        const b = bbox(strokes[i]), pad = 12;
-        if (p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad) return i;
+        const s = strokes[i];
+        const q = toLocal(p, s);
+        const b = localBox(s);
+        if (q.x >= b.x1 - pad && q.x <= b.x2 + pad && q.y >= b.y1 - pad && q.y <= b.y2 + pad) return i;
       }
       return -1;
     }
 
     function handleAt(p) {
       if (sel < 0) return null;
+      const lim = HITv();
+      let best = null, bestD = Infinity;
       for (const h of handles(strokes[sel])) {
         const d = Math.hypot(p.x - h.x, p.y - h.y);
-        if (d <= HR + 10) return h.id;
+        if (d <= lim && d < bestD) { bestD = d; best = h.id; }
       }
-      return null;
+      return best;
     }
 
     // Resize a mark around the corner opposite the one being dragged.
@@ -556,6 +619,12 @@ function annotateImage(src, existing) {
 
     function drawShape(s) {
       ctx.save();
+      if (s.rot) {                      // spin the mark about its own centre
+        const b = localBox(s);
+        ctx.translate((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2);
+        ctx.rotate(s.rot);
+        ctx.translate(-(b.x1 + b.x2) / 2, -(b.y1 + b.y2) / 2);
+      }
       ctx.strokeStyle = s.color;
       ctx.fillStyle = s.color;
       ctx.lineWidth = s.size;
@@ -593,6 +662,73 @@ function annotateImage(src, existing) {
       ctx.restore();
     }
 
+    // Text is typed straight onto the picture: a transparent textarea is laid
+    // over the canvas at the tap point, sized and coloured like the final mark,
+    // so what you type is what you see. Committed on blur or Enter.
+    let liveText = null;
+
+    function openTextInput(canvasPt, existingIdx) {
+      if (liveText) return;
+      const s = existingIdx != null ? strokes[existingIdx] : null;
+      const k = dscale();
+      const r = canvas.getBoundingClientRect();
+      const wrapRect = wrap.querySelector(".ecanvas-wrap").getBoundingClientRect();
+      const fsCanvas = Math.max(16, (s ? s.size : size) * 4);
+      const col = s ? s.color : stroke;
+
+      const ta = document.createElement("textarea");
+      ta.className = "elive";
+      ta.value = s ? s.text : "";
+      ta.rows = 1;
+      // place it where the tap landed, converting canvas px back to screen px
+      ta.style.left = (r.left - wrapRect.left + canvasPt.x / k) + "px";
+      ta.style.top  = (r.top  - wrapRect.top  + canvasPt.y / k) + "px";
+      ta.style.fontSize = (fsCanvas / k) + "px";
+      ta.style.color = col;
+      ta.style.textShadow = (col.toUpperCase() === "#FFFFFF")
+        ? "0 0 3px #000, 0 0 3px #000" : "0 0 3px #fff, 0 0 3px #fff";
+      wrap.querySelector(".ecanvas-wrap").appendChild(ta);
+
+      if (s) { s.hidden = true; redraw(); }   // hide the original while editing
+      liveText = { el:ta, pt:canvasPt, idx:existingIdx };
+      setTimeout(() => { ta.focus(); ta.select(); }, 0);
+
+      function autosize() {
+        ta.style.width = "auto";
+        ta.style.width = Math.max(60, ta.scrollWidth + 8) + "px";
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+      }
+      autosize();
+      ta.addEventListener("input", autosize);
+      ta.addEventListener("keydown", ev => {
+        if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commitText(); }
+        if (ev.key === "Escape") { ev.preventDefault(); commitText(true); }
+      });
+      ta.addEventListener("blur", () => commitText());
+    }
+
+    function commitText(cancel) {
+      if (!liveText) return;
+      const { el, pt, idx } = liveText;
+      const txt = el.value.replace(/\s+$/, "");
+      liveText = null;
+      if (el.parentNode) el.parentNode.removeChild(el);
+
+      if (idx != null) {
+        const s = strokes[idx];
+        delete s.hidden;
+        if (!cancel) {
+          if (txt.trim()) { s.text = txt; sel = idx; }
+          else { strokes.splice(idx, 1); sel = -1; }
+        }
+      } else if (!cancel && txt.trim()) {
+        strokes.push({ type:"text", text:txt, x1:pt.x, y1:pt.y, color:stroke, size:size });
+        sel = strokes.length - 1;
+      }
+      redraw();
+    }
+
     function pos(e) {
       const r = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
@@ -603,30 +739,50 @@ function annotateImage(src, existing) {
     }
 
     let dragFrom = null;      // last pointer position while moving a mark
-    let resizing = null;      // { id, ax, ay, d0 } while dragging a corner handle
+    let resizing = null;      // { ax, ay, d0 } while dragging a corner handle
+    let rotating = null;      // { cx, cy, a0, r0 } while dragging the rotate grip
     let movedFar = false;     // distinguishes a tap from a drag
     let downAt = null;
 
     function start(e) {
       if (!baseReady) return;
+      if (liveText) { commitText(); return; }   // finish typing first
       e.preventDefault();
       const p = pos(e);
       downAt = p;
       movedFar = false;
 
       // 1. grabbing a corner handle of the selected mark => resize
-      const h = handleAt(p);
+      const h = handleAt(p);   // "tl".."br", "rot", or null
+      if (h === "rot") {
+        const s = strokes[sel];
+        const c0 = centreOf(s);
+        rotating = {
+          cx: c0.x, cy: c0.y,
+          a0: Math.atan2(p.y - c0.y, p.x - c0.x),
+          r0: s.rot || 0
+        };
+        return;
+      }
       if (h) {
-        const b = bbox(strokes[sel]);
-        const ax = h.id.includes("l") ? b.x2 : b.x1;   // anchor = opposite corner
-        const ay = h.id.includes("t") ? b.y2 : b.y1;
-        resizing = { ax:ax, ay:ay, d0: Math.max(8, Math.hypot(p.x - ax, p.y - ay)) };
+        const s = strokes[sel];
+        const b = localBox(s);
+        const q = toLocal(p, s);                    // work in the mark's frame
+        const ax = h.includes("l") ? b.x2 : b.x1;   // anchor = opposite corner
+        const ay = h.includes("t") ? b.y2 : b.y1;
+        const min = 12 * dscale();
+        resizing = { ax:ax, ay:ay, d0: Math.max(min, Math.hypot(q.x - ax, q.y - ay)) };
         return;
       }
 
       // 2. touching an existing mark => select it and start moving
       const hit = hitTest(p);
       if (hit >= 0) {
+        // tapping the already-selected text opens it for retyping
+        if (strokes[hit].type === "text" && sel === hit) {
+          openTextInput({ x:strokes[hit].x1, y:strokes[hit].y1 }, hit);
+          return;
+        }
         sel = hit;
         dragFrom = p;
         redraw();
@@ -636,12 +792,7 @@ function annotateImage(src, existing) {
       // 3. empty space => deselect and start a new mark
       sel = -1;
       if (tool === "text") {
-        const txt = prompt("画像に入れる文字を入力してください");
-        if (txt && txt.trim()) {
-          strokes.push({ type:"text", text:txt.trim(), x1:p.x, y1:p.y, color:stroke, size:size });
-          sel = strokes.length - 1;
-        }
-        redraw();
+        openTextInput(p, null);
         return;
       }
       active = { type:tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:stroke, size:size };
@@ -649,15 +800,23 @@ function annotateImage(src, existing) {
     }
 
     function move(e) {
-      if (!resizing && !dragFrom && !active) return;
+      if (!resizing && !rotating && !dragFrom && !active) return;
       e.preventDefault();
       const p = pos(e);
       if (downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > 5) movedFar = true;
 
+      if (rotating) {
+        const a = Math.atan2(p.y - rotating.cy, p.x - rotating.cx);
+        strokes[sel].rot = rotating.r0 + (a - rotating.a0);
+        redraw();
+        return;
+      }
       if (resizing) {
-        const d = Math.max(8, Math.hypot(p.x - resizing.ax, p.y - resizing.ay));
+        const min = 12 * dscale();
+        const q = toLocal(p, strokes[sel]);
+        const d = Math.max(min, Math.hypot(q.x - resizing.ax, q.y - resizing.ay));
         const f = d / resizing.d0;
-        if (f > 0.05 && f < 20) {
+        if (f > 0.02 && f < 50) {
           scaleShape(strokes[sel], f, resizing.ax, resizing.ay);
           resizing.d0 = d;
           redraw();
@@ -680,6 +839,7 @@ function annotateImage(src, existing) {
     function end() {
       dragFrom = null;
       resizing = null;
+      rotating = null;
       downAt = null;
       if (!active) return;
       const a = active;
@@ -696,8 +856,7 @@ function annotateImage(src, existing) {
       const i = hitTest(p);
       if (i < 0 || strokes[i].type !== "text") return;
       e.preventDefault();
-      const txt = prompt("文字を書き直してください", strokes[i].text);
-      if (txt != null && txt.trim()) { strokes[i].text = txt.trim(); sel = i; redraw(); }
+      openTextInput({ x:strokes[i].x1, y:strokes[i].y1 }, i);
     }
 
     canvas.addEventListener("dblclick", dbl);
@@ -744,6 +903,7 @@ function annotateImage(src, existing) {
     }
     wrap.querySelector("#ecancel").onclick = () => { cleanup(); resolve(null); };
     wrap.querySelector("#edone").onclick = () => {
+      commitText();
       sel = -1;
       redraw();
       const marks = strokes.map(norm);
