@@ -368,8 +368,10 @@ function pickFile(useCamera) {
 
 // ---------- photo annotation editor ----------
 // Opens after a photo is picked (or from "書き込む" on an existing photo).
-// Resolves to a Blob of the annotated image, or null if cancelled.
-function annotateImage(src) {
+// `existing` are marks from a previous session, so they can be edited or
+// removed rather than being permanently burned into the image.
+// Resolves to { blob, marks } or null if cancelled.
+function annotateImage(src, existing) {
   return new Promise(resolve => {
     const wrap = document.createElement("div");
     wrap.className = "editor-bg";
@@ -380,6 +382,7 @@ function annotateImage(src) {
           '<button class="etool" data-tool="arrow">矢印</button>' +
           '<button class="etool" data-tool="rect">囲み</button>' +
           '<button class="etool" data-tool="text">文字</button>' +
+          '<button class="etool" data-tool="pick">選択</button>' +
         '</div>' +
         '<div class="etoolbar">' +
           '<span class="ecolors">' +
@@ -396,6 +399,8 @@ function annotateImage(src) {
             '<button class="esize" data-size="11">太</button>' +
           '</span>' +
           '<button class="ebtn" id="eundo">戻す</button>' +
+          '<button class="ebtn" id="edel" style="color:#B5552F">選択を削除</button>' +
+          '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
         '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
         '<div class="eactions">' +
@@ -411,8 +416,9 @@ function annotateImage(src) {
     img.crossOrigin = "anonymous";
 
     let tool = "draw", stroke = "#E03131", size = 6;
-    let strokes = [];          // committed shapes
+    let strokes = (existing || []).map(s => JSON.parse(JSON.stringify(s)));
     let active = null;         // in-progress shape
+    let sel = -1;              // index of the selected mark
     let baseReady = false;
 
     function fit() {
@@ -429,7 +435,46 @@ function annotateImage(src) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const all = active ? strokes.concat([active]) : strokes;
-      for (const s of all) drawShape(s);
+      all.forEach((s, i) => {
+        drawShape(s);
+        if (i === sel && !active) outline(s);
+      });
+    }
+
+    // Bounding box of a mark, used for selection and the highlight ring.
+    function bbox(s) {
+      if (s.type === "draw") {
+        const xs = s.pts.map(p => p.x), ys = s.pts.map(p => p.y);
+        return { x1:Math.min(...xs), y1:Math.min(...ys), x2:Math.max(...xs), y2:Math.max(...ys) };
+      }
+      if (s.type === "text") {
+        const fs = Math.max(16, s.size * 4);
+        const lines = String(s.text).split("\n");
+        const w = Math.max(...lines.map(l => l.length)) * fs * 0.62;
+        return { x1:s.x1, y1:s.y1, x2:s.x1 + w, y2:s.y1 + lines.length * fs * 1.25 };
+      }
+      return {
+        x1:Math.min(s.x1, s.x2), y1:Math.min(s.y1, s.y2),
+        x2:Math.max(s.x1, s.x2), y2:Math.max(s.y1, s.y2)
+      };
+    }
+
+    function outline(s) {
+      const b = bbox(s), pad = 8;
+      ctx.save();
+      ctx.strokeStyle = "#1971C2";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(b.x1 - pad, b.y1 - pad, (b.x2 - b.x1) + pad*2, (b.y2 - b.y1) + pad*2);
+      ctx.restore();
+    }
+
+    function hitTest(p) {
+      for (let i = strokes.length - 1; i >= 0; i--) {
+        const b = bbox(strokes[i]), pad = 10;
+        if (p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad) return i;
+      }
+      return -1;
     }
 
     function drawShape(s) {
@@ -484,10 +529,18 @@ function annotateImage(src) {
       };
     }
 
+    let dragFrom = null;
+
     function start(e) {
       if (!baseReady) return;
       e.preventDefault();
       const p = pos(e);
+      if (tool === "pick") {
+        sel = hitTest(p);
+        dragFrom = sel >= 0 ? p : null;
+        redraw();
+        return;
+      }
       if (tool === "text") {
         const txt = prompt("画像に入れる文字を入力してください");
         if (txt && txt.trim()) {
@@ -502,6 +555,18 @@ function annotateImage(src) {
       redraw();
     }
     function move(e) {
+      if (tool === "pick") {
+        if (dragFrom == null || sel < 0) return;
+        e.preventDefault();
+        const p = pos(e);
+        const dx = p.x - dragFrom.x, dy = p.y - dragFrom.y;
+        const s = strokes[sel];
+        if (s.type === "draw") s.pts = s.pts.map(q => ({ x:q.x + dx, y:q.y + dy }));
+        else { s.x1 += dx; s.y1 += dy; if (s.x2 != null) { s.x2 += dx; s.y2 += dy; } }
+        dragFrom = p;
+        redraw();
+        return;
+      }
       if (!active) return;
       e.preventDefault();
       const p = pos(e);
@@ -510,12 +575,14 @@ function annotateImage(src) {
       redraw();
     }
     function end() {
+      dragFrom = null;
       if (!active) return;
       const a = active;
       active = null;
       const tiny = a.type !== "draw" &&
         Math.abs(a.x2 - a.x1) < 4 && Math.abs(a.y2 - a.y1) < 4;
       if (!tiny) strokes.push(a);
+      sel = -1;
       redraw();
     }
 
@@ -528,6 +595,9 @@ function annotateImage(src) {
 
     wrap.querySelectorAll(".etool").forEach(b => b.onclick = () => {
       tool = b.dataset.tool;
+      if (tool !== "pick") sel = -1;
+      canvas.style.cursor = tool === "pick" ? "pointer" : "crosshair";
+      redraw();
       wrap.querySelectorAll(".etool").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
     });
@@ -535,13 +605,25 @@ function annotateImage(src) {
       stroke = b.dataset.color;
       wrap.querySelectorAll(".ecolor").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
+      if (sel >= 0) { strokes[sel].color = stroke; redraw(); }
     });
     wrap.querySelectorAll(".esize").forEach(b => b.onclick = () => {
       size = Number(b.dataset.size);
       wrap.querySelectorAll(".esize").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
+      if (sel >= 0) { strokes[sel].size = size; redraw(); }
     });
-    wrap.querySelector("#eundo").onclick = () => { strokes.pop(); redraw(); };
+    wrap.querySelector("#eundo").onclick = () => { strokes.pop(); sel = -1; redraw(); };
+    wrap.querySelector("#edel").onclick = () => {
+      if (sel < 0) { alert("「選択」で消したい書き込みをタップしてから押してください。"); return; }
+      strokes.splice(sel, 1);
+      sel = -1;
+      redraw();
+    };
+    wrap.querySelector("#eclear").onclick = () => {
+      if (!strokes.length) return;
+      if (confirm("書き込みをすべて消します。よろしいですか?")) { strokes = []; sel = -1; redraw(); }
+    };
 
     function cleanup() {
       window.removeEventListener("mouseup", end);
@@ -549,7 +631,10 @@ function annotateImage(src) {
     }
     wrap.querySelector("#ecancel").onclick = () => { cleanup(); resolve(null); };
     wrap.querySelector("#edone").onclick = () => {
-      canvas.toBlob(b => { cleanup(); resolve(b); }, "image/jpeg", 0.88);
+      sel = -1;
+      redraw();
+      const marks = JSON.parse(JSON.stringify(strokes));
+      canvas.toBlob(b => { cleanup(); resolve({ blob: b, marks: marks }); }, "image/jpeg", 0.88);
     };
 
     img.onload = () => { baseReady = true; fit(); redraw(); };
@@ -567,35 +652,55 @@ function blobToUrlSrc(fileOrBlob) {
   });
 }
 
+// A photo is stored as { base, display, marks }:
+//   base    = the clean uploaded original (never changes)
+//   marks   = the annotation shapes, kept as data so they stay editable
+//   display = base + marks flattened, re-uploaded whenever marks change
+// Older entries were plain URL strings with the marks already burned in;
+// those are wrapped so they still show, but start with no editable marks.
+function asPhoto(v) {
+  if (!v) return null;
+  if (typeof v === "string") return { base: v, display: v, marks: [] };
+  return { base: v.base, display: v.display || v.base, marks: v.marks || [] };
+}
+function photoSrc(v) { const p = asPhoto(v); return p ? p.display : ""; }
+
+function getPhotoEntry(target, key, idx) {
+  return target === "item" ? asPhoto(photosOf(key)[idx]) : asPhoto(matPhotos[key]);
+}
+function putPhotoEntry(target, key, idx, entry) {
+  if (target === "item") {
+    const list = photosOf(key).slice();
+    if (idx == null) list.push(entry); else list[idx] = entry;
+    setPhotosOf(key, list);
+  } else matPhotos[key] = entry;
+}
+
 async function setPhoto(target, key, useCamera) {
   const file = await pickFile(useCamera);
   if (!file) return;
   let src;
   try { src = await blobToUrlSrc(file); }
   catch (e) { status = { type:"err", msg:"画像を読めませんでした" }; render(); return; }
-  const edited = await annotateImage(src);
-  if (!edited) return;
+  const result = await annotateImage(src, []);
+  if (!result) return;
   await withSave(async () => {
-    const url = await uploadImage(edited);
-    if (target === "item") setPhotosOf(key, photosOf(key).concat([url]));
-    else matPhotos[key] = url;
+    const baseUrl = await uploadImage(file);
+    const displayUrl = result.marks.length ? await uploadImage(result.blob) : baseUrl;
+    putPhotoEntry(target, key, null, { base: baseUrl, display: displayUrl, marks: result.marks });
   }, "写真を登録しました");
 }
 
 // Re-open the editor on a photo that is already registered.
 // For items, idx selects which of the item's photos to edit.
 async function annotateExisting(target, key, idx) {
-  const cur = target === "item" ? photosOf(key)[idx] : matPhotos[key];
-  if (!cur) return;
-  const edited = await annotateImage(cur);
-  if (!edited) return;
+  const entry = getPhotoEntry(target, key, idx);
+  if (!entry) return;
+  const result = await annotateImage(entry.base, entry.marks);
+  if (!result) return;
   await withSave(async () => {
-    const url = await uploadImage(edited);
-    if (target === "item") {
-      const list = photosOf(key).slice();
-      list[idx] = url;
-      setPhotosOf(key, list);
-    } else matPhotos[key] = url;
+    const displayUrl = result.marks.length ? await uploadImage(result.blob) : entry.base;
+    putPhotoEntry(target, key, idx, { base: entry.base, display: displayUrl, marks: result.marks });
   }, "書き込みを保存しました");
 }
 
@@ -742,7 +847,7 @@ function renderModal() {
     html += '<div class="field"><label>登録済みの資材から選ぶ(任意)</label>';
     html += '<div class="picker" id="picker">';
     for (const k of modal.picker) {
-      const ph = matPhotos[k.material_name];
+      const ph = photoSrc(matPhotos[k.material_name]);
       const thumb = ph
         ? '<img class="pthumb" src="' + esc(ph) + '" onerror="this.style.display=\'none\'" />'
         : '<div class="pthumb empty">写真<br>なし</div>';
@@ -866,7 +971,7 @@ function renderList() {
         b.style.background = "#fff"; b.style.color = "#2B2A24";
         b.style.fontWeight = "600"; b.style.borderLeftColor = color(c);
       }
-      const firstPhoto = photosOf(i.item)[0];
+      const firstPhoto = photoSrc(photosOf(i.item)[0]);
       const th = firstPhoto
         ? '<img class="thumb" src="' + esc(firstPhoto) + '" onerror="this.style.display=\'none\'" />' : "";
       b.innerHTML = '<span class="left">' + th + esc(i.item) + '</span><span class="count">' + i.materials.length + "</span>";
@@ -904,7 +1009,7 @@ function renderDetail() {
     let rowsHtml = "";
     for (const m of list) {
       const isCommon = m.common_or_dedicated === "共通";
-      const p = matPhotos[m.material_name];
+      const p = photoSrc(matPhotos[m.material_name]);
       const thumb = p
         ? '<img class="matthumb" src="' + esc(p) + '" onerror="this.style.display=\'none\'" />'
         : '<div class="matthumb empty">写真<br>なし</div>';
@@ -935,7 +1040,7 @@ function renderDetail() {
     galleryHtml = '<div class="gallery">';
     photos.forEach((u, i) => {
       galleryHtml += '<div class="gcard">' +
-        '<div class="gimg"><img src="' + esc(u) + '" alt="" onerror="this.style.display=\'none\'" /></div>' +
+        '<div class="gimg"><img src="' + esc(photoSrc(u)) + '" alt="" onerror="this.style.display=\'none\'" /></div>' +
         '<div class="gacts">' +
           '<button class="minibtn" data-iw="' + i + '">書き込む</button>' +
           '<button class="minibtn" data-ix="' + i + '" style="color:#B5552F">削除</button>' +
