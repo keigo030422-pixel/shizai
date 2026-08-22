@@ -2625,22 +2625,61 @@ document.getElementById("search").addEventListener("input", e => {
 // loadAll() calls this when it finishes.
 let unlocked = false;
 
+// Because the form never navigates away, Chrome cannot tell on its own that
+// a sign-in succeeded. The Credential Management API is the supported way to
+// tell it explicitly, which is what triggers the "save password?" prompt.
+async function offerToSavePassword(pw) {
+  try {
+    if (!window.PasswordCredential || !navigator.credentials) return;
+    const cred = new window.PasswordCredential({
+      id: document.getElementById("lockuser").value || "shizai",
+      password: pw,
+      name: "品目別 資材ビューア"
+    });
+    await navigator.credentials.store(cred);
+  } catch (e) {
+    // Not supported everywhere; failing here just means no prompt.
+    console.debug("credential store skipped", e);
+  }
+}
+
 function tryUnlock() {
   const inp = document.getElementById("lockpass");
   const err = document.getElementById("lockerr");
-  if ((inp.value || "").trim() === passcode) {
+  const entered = (inp.value || "").trim();
+  if (entered === passcode) {
     unlocked = true;
     try { sessionStorage.setItem("pmv_ok", "1"); } catch (e) {}
     document.getElementById("lock").classList.add("done");
     err.textContent = "";
-    // Leave the value in place briefly: clearing it immediately can stop the
-    // browser from noticing a successful sign-in and offering to save it.
-    setTimeout(() => { inp.value = ""; }, 1500);
+    offerToSavePassword(entered);
+    setTimeout(() => { inp.value = ""; }, 2000);
   } else {
     err.textContent = "パスワードが違います";
     inp.value = "";
     inp.focus();
   }
+}
+
+// If the browser already has a saved credential, use it so returning users
+// are not asked again.
+async function tryStoredCredential() {
+  try {
+    if (!navigator.credentials || !navigator.credentials.get) return false;
+    const cred = await navigator.credentials.get({ password: true, mediation: "optional" });
+    if (cred && cred.password === passcode) {
+      unlocked = true;
+      try { sessionStorage.setItem("pmv_ok", "1"); } catch (e) {}
+      document.getElementById("lock").classList.add("done");
+      return true;
+    }
+    if (cred && cred.password) {
+      document.getElementById("lockpass").value = cred.password;
+    }
+  } catch (e) {
+    console.debug("credential get skipped", e);
+  }
+  return false;
 }
 
 function initLock() {
@@ -2658,7 +2697,9 @@ function initLock() {
     document.getElementById("lock").classList.add("done");
     return;
   }
-  document.getElementById("lockpass").focus();
+  tryStoredCredential().then(ok => {
+    if (!ok) document.getElementById("lockpass").focus();
+  });
 }
 
 // Submitting a form (rather than just clicking a button) is the signal the
