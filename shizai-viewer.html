@@ -28,6 +28,10 @@
   .mrow { padding:11px 14px; border-bottom:1px solid #E3DFD1; background:#fff;
           display:flex; gap:10px; align-items:flex-start; }
   .mrow .matthumb { cursor:zoom-in; }
+  .jumprow { cursor:pointer; align-items:center; }
+  .jumprow:active { background:#F7F5EE; }
+  .jumparrow { color:#B5AF9E; font-size:22px; line-height:1; flex-shrink:0; }
+  .back-btn + .back-btn { padding-top:0; }
   .muses { font-size:11px; color:#9A9382; margin-top:3px; }
   .search-wrap { padding:10px 12px; background:#EAE6D9; border-bottom:1px solid #D8D2C0; }
   .search-wrap input { width:100%; padding:9px 12px; border-radius:8px;
@@ -286,6 +290,7 @@ let showHidden = false; // reveal items marked hidden
 let arrangeCat = null;  // item category currently being reordered
 let arrangeMatCat = null; // material category currently being reordered
 let listScroll = 0;     // remembered scroll position of the list pane
+let cameFromMat = null; // material we jumped from, to offer a way back
 
 function rememberScroll() {
   const el = document.getElementById("list");
@@ -402,7 +407,16 @@ async function saveAll() {
 }
 
 async function withSave(fn, okMsg) {
-  busy = true; status = null; render();
+  // Rebuilding the list throws away its scroll position, which is jarring
+  // mid-drag when every drop triggers a save. Hold the position across the
+  // whole operation and put it back once the final render is done.
+  const keep = (() => { const el = document.getElementById("list"); return el ? el.scrollTop : 0; })();
+  const putBack = () => {
+    const el = document.getElementById("list");
+    if (el) el.scrollTop = keep;
+  };
+
+  busy = true; status = null; render(); putBack();
   try {
     await fn();
     await saveAll();
@@ -412,6 +426,9 @@ async function withSave(fn, okMsg) {
     status = { type:"err", msg: "エラー: " + e.message };
   } finally {
     busy = false; refreshItems(); render();
+    putBack();
+    requestAnimationFrame(putBack);
+    listScroll = keep;
   }
 }
 
@@ -2007,9 +2024,11 @@ function renderMatDetail() {
       '<div class="matgroup">' +
         '<div class="gh" style="background:#EFEDE4;color:#5A5648">この資材を使っている品目</div>' +
         (users.length
-          ? users.map(u => '<div class="matrow"><div class="matbody">' +
+          ? users.map(u => '<div class="matrow jumprow" data-jump="' + esc(u.item) + '">' +
+              '<div class="matbody">' +
               '<span class="matname">' + esc(u.item) + "</span>" +
-              '<div class="supplier">' + esc(u.category || "その他") + "</div></div></div>").join("")
+              '<div class="supplier">' + esc(u.category || "その他") + "</div></div>" +
+              '<span class="jumparrow">›</span></div>').join("")
           : '<div class="matrow"><div class="matbody"><span class="supplier">まだどの品目にも使われていません</span></div></div>') +
       "</div>" +
     "</div>";
@@ -2028,6 +2047,24 @@ function renderMatDetail() {
   if (mw) mw.onclick = () => annotateExisting("mat", selectedMat, 0);
   const md = document.getElementById("mdel");
   if (md) md.onclick = () => clearPhoto("mat", selectedMat);
+  el.querySelectorAll("[data-jump]").forEach(rowEl =>
+    rowEl.onclick = () => {
+      cameFromMat = selectedMat;   // so the item screen can offer a way back
+      selected = rowEl.dataset.jump;
+      view = "items";
+      activeCat = "全て";
+      query = "";
+      status = null;
+      listScroll = 0;
+      const s = document.getElementById("search");
+      if (s) s.value = "";
+      if (window.innerWidth < 768) {
+        document.getElementById("sidebar").classList.add("hidden");
+        document.getElementById("main").classList.remove("hidden");
+      }
+      render();
+    });
+
   document.getElementById("medit").onclick = () => masterMaterialModal(info);
   document.getElementById("mdup").onclick = () => duplicateMaterialModal(info);
   document.getElementById("mremove").onclick = () => removeMaterialModal(info, users.length);
@@ -2348,6 +2385,10 @@ function renderDetail() {
 
   el.innerHTML =
     '<div class="detail">' +
+      (cameFromMat
+        ? '<button class="back-btn" style="color:#5A5648" id="backmat">← 資材「' +
+          esc(cameFromMat) + '」に戻る</button>'
+        : "") +
       '<button class="back-btn" style="color:' + c + '" id="back">← 一覧に戻る</button>' +
       '<div class="badges">' +
         '<span class="badge" style="background:' + c + '22;color:' + c + '">' + esc(cur.category || "その他") + "</span>" +
@@ -2375,8 +2416,23 @@ function renderDetail() {
       matHtml +
     "</div>";
 
+  const backmat = document.getElementById("backmat");
+  if (backmat) backmat.onclick = () => {
+    selectedMat = cameFromMat;
+    cameFromMat = null;
+    view = "materials";
+    query = "";
+    status = null;
+    const s = document.getElementById("search");
+    if (s) s.value = "";
+    document.getElementById("sidebar").classList.add("hidden");
+    document.getElementById("main").classList.remove("hidden");
+    render();
+  };
+
   const back = document.getElementById("back");
   if (back) back.onclick = () => {
+    cameFromMat = null;
     document.getElementById("sidebar").classList.remove("hidden");
     document.getElementById("main").classList.add("hidden");
     restoreScroll();
@@ -2485,6 +2541,7 @@ function switchView(v) {
   arrangeCat = null;
   arrangeMatCat = null;
   listScroll = 0;   // different list entirely, so start at the top
+  cameFromMat = null;
   const s = document.getElementById("search");
   if (s) s.value = "";
   // back to the list pane on phones, since the detail may not apply any more
