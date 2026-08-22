@@ -93,7 +93,15 @@
   .gimg { width:190px; height:190px; background:#fff; border:1px solid #D8D2C0;
           border-radius:12px; overflow:hidden; display:flex;
           align-items:center; justify-content:center; }
-  .gimg img { width:100%; height:100%; object-fit:cover; }
+  .gimg img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; }
+  .matthumb { cursor:zoom-in; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:100;
+              display:flex; align-items:center; justify-content:center; padding:16px; }
+  .lightbox img { max-width:100%; max-height:100%; object-fit:contain;
+                  border-radius:6px; }
+  .lbclose { position:absolute; top:14px; right:16px; width:40px; height:40px;
+             border-radius:999px; border:none; background:rgba(255,255,255,.9);
+             color:#2B2A24; font-size:18px; cursor:pointer; }
   .gacts { display:flex; gap:6px; margin-top:6px; }
   .gacts .minibtn { flex:1; text-align:center; }
   .editor-bg { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:80;
@@ -225,6 +233,7 @@ let query = "";
 let busy = false;
 let status = null;
 let modal = null;
+let pendingCats = [];   // categories created but with no items yet
 
 function newId() { return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -250,7 +259,8 @@ function refreshItems() {
   if (!itemMap.has(selected)) selected = itemMap.keys().next().value || null;
 }
 function allCats() {
-  return [...new Set([...itemMap.values()].map(i => i.category || "その他"))];
+  const used = [...itemMap.values()].map(i => i.category || "その他");
+  return [...new Set(used.concat(pendingCats))];
 }
 
 // ---------- storage ----------
@@ -755,6 +765,7 @@ function annotateImage(src, existing) {
     let resizing = null;      // { ax, ay, d0 } while dragging a corner handle
     let rotating = null;      // { cx, cy, a0, r0 } while dragging the rotate grip
     let movedFar = false;     // distinguishes a tap from a drag
+    let tapCandidate = -1;    // text mark that a still tap would reopen
     let downAt = null;
 
     function start(e) {
@@ -765,6 +776,7 @@ function annotateImage(src, existing) {
       const p = pos(e);
       downAt = p;
       movedFar = false;
+      tapCandidate = -1;
 
       // 1. grabbing a corner handle of the selected mark => resize
       const h = handleAt(p);   // "tl".."br", "rot", or null
@@ -790,10 +802,12 @@ function annotateImage(src, existing) {
       }
 
       // 2. touching an existing mark => select it and start moving.
-      // Retyping is done with the 文字を直す button, never by tapping, so a
-      // touch here is always a plain select-and-move.
+      // If it is text that was already selected, a tap that never travels
+      // reopens it for retyping; the decision is made in end(), so dragging
+      // still just moves it.
       const hit = hitTest(p);
       if (hit >= 0) {
+        tapCandidate = (strokes[hit].type === "text" && sel === hit) ? hit : -1;
         sel = hit;
         dragFrom = p;
         redraw();
@@ -855,10 +869,20 @@ function annotateImage(src, existing) {
     }
 
     function end() {
+      const wasDragging = dragFrom != null;
       dragFrom = null;
       resizing = null;
       rotating = null;
       downAt = null;
+
+      // A still tap on already-selected text means "let me retype this".
+      if (wasDragging && !movedFar && tapCandidate >= 0) {
+        const i = tapCandidate;
+        tapCandidate = -1;
+        openTextInput({ x:strokes[i].x1, y:strokes[i].y1 }, i);
+        return;
+      }
+      tapCandidate = -1;
 
       if (!active) return;
       const a = active;
@@ -1008,9 +1032,87 @@ async function clearPhoto(target, key, idx) {
   }, "写真を削除しました");
 }
 
+// Full-screen photo viewer. Tapping any thumbnail opens the picture large,
+// with pinch-zoom left to the browser and a tap anywhere to close.
+function openLightbox(src) {
+  if (!src) return;
+  const bg = document.createElement("div");
+  bg.className = "lightbox";
+  bg.innerHTML =
+    '<button class="lbclose" aria-label="閉じる">✕</button>' +
+    '<img src="' + esc(src) + '" alt="" />';
+  bg.onclick = () => { if (bg.parentNode) document.body.removeChild(bg); };
+  document.body.appendChild(bg);
+}
+
 // ---------- modals ----------
 function openModal(cfg) { modal = cfg; renderModal(); }
 function closeModal() { modal = null; renderModal(); }
+
+// Categories are not stored separately: they live on the material rows. So
+// renaming one means rewriting every row that carries it, and a brand-new
+// category has nothing to attach to until it gets its first item.
+function categoryFormModal(existingCat) {
+  const count = existingCat
+    ? [...itemMap.values()].filter(i => (i.category || "その他") === existingCat).length
+    : 0;
+  openModal({
+    title: existingCat ? "商品分類を編集" : "商品分類を追加",
+    message: existingCat ? ("この分類の品目: " + count + " 件") : "",
+    fields: [
+      { key:"name", label:"分類名", value: existingCat || "", required:true }
+    ],
+    extraButton: existingCat
+      ? { label:"この分類を削除", danger:true, onClick: () => deleteCategoryModal(existingCat, count) }
+      : null,
+    onSubmit: async vals => {
+      const name = vals.name.trim();
+      if (!name) throw new Error("分類名を入力してください");
+      if (!existingCat) {
+        if (allCats().includes(name) || pendingCats.includes(name)) {
+          throw new Error("その分類はすでにあります");
+        }
+        pendingCats.push(name);
+        activeCat = name;
+        render();
+        return;
+      }
+      if (name === existingCat) return;
+      await withSave(async () => {
+        for (const r of rows) if ((r.category || "その他") === existingCat) r.category = name;
+        pendingCats = pendingCats.filter(x => x !== existingCat);
+        activeCat = name;
+      }, "分類名を変更しました");
+    }
+  });
+}
+
+function deleteCategoryModal(cat, count) {
+  if (!count) {
+    pendingCats = pendingCats.filter(x => x !== cat);
+    activeCat = "全て";
+    closeModal();
+    render();
+    return;
+  }
+  const others = allCats().filter(x => x !== cat);
+  openModal({
+    title: "分類を削除",
+    message: "「" + cat + "」には品目が " + count + " 件あります。品目の移動先を選ぶか、空欄のままにすると「その他」になります。",
+    fields: [
+      { key:"moveTo", label:"移動先の分類", value: others[0] || "その他", list: others.concat(["その他"]) }
+    ],
+    danger: true,
+    onSubmit: async vals => {
+      const to = vals.moveTo.trim() || "その他";
+      await withSave(async () => {
+        for (const r of rows) if ((r.category || "その他") === cat) r.category = to;
+        pendingCats = pendingCats.filter(x => x !== cat);
+        activeCat = "全て";
+      }, "分類を削除しました");
+    }
+  });
+}
 
 function itemFormModal(existingItem) {
   const cur = existingItem ? itemMap.get(existingItem) : null;
@@ -1170,12 +1272,20 @@ function renderModal() {
     }
     html += "</div>";
   }
+  if (modal.extraButton) {
+    html += '<button class="btn" id="mextra" style="width:100%;margin-top:4px;background:#fff;' +
+            'border:1px solid #D8D2C0;color:' + (modal.extraButton.danger ? "#B5552F" : "#5A5648") + '">' +
+            esc(modal.extraButton.label) + "</button>";
+  }
   html += '<div class="modal-actions">';
   html += '<button class="btn" id="mcancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>';
   html += '<button class="btn" id="mok" style="background:' + (modal.danger ? "#B5552F" : c) + '">' +
           (modal.danger ? "削除する" : "保存") + "</button>";
   html += "</div></div></div>";
   root.innerHTML = html;
+
+  const extra = document.getElementById("mextra");
+  if (extra) extra.onclick = () => modal.extraButton.onClick();
 
   root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
     const k = (modal.picker || []).find(x => x.material_name === b.dataset.pick);
@@ -1226,6 +1336,24 @@ function renderCats() {
     b.onclick = () => { activeCat = c; render(); };
     el.appendChild(b);
   }
+  // Editing a category is offered only while that category is the active
+  // filter, so the row of chips stays readable.
+  if (activeCat !== "全て") {
+    const edit = document.createElement("button");
+    edit.className = "cat-btn";
+    edit.textContent = "✎ " + activeCat + " を編集";
+    edit.style.borderColor = color(activeCat);
+    edit.style.color = color(activeCat);
+    edit.onclick = () => categoryFormModal(activeCat);
+    el.appendChild(edit);
+  }
+  const add = document.createElement("button");
+  add.className = "cat-btn";
+  add.textContent = "＋ 分類を追加";
+  add.style.borderColor = "#3F7D4A";
+  add.style.color = "#3F7D4A";
+  add.onclick = () => categoryFormModal(null);
+  el.appendChild(add);
 }
 
 function renderList() {
@@ -1305,7 +1433,8 @@ function renderDetail() {
       const isCommon = m.common_or_dedicated === "共通";
       const p = photoSrc(matPhotos[m.material_name]);
       const thumb = p
-        ? '<img class="matthumb" src="' + esc(p) + '" onerror="this.style.display=\'none\'" />'
+        ? '<img class="matthumb" src="' + esc(p) + '" data-zoom="' + esc(p) +
+          '" onerror="this.style.display=\'none\'" />'
         : '<div class="matthumb empty">写真<br>なし</div>';
       rowsHtml += '<div class="matrow">' + thumb + '<div class="matbody">' +
         '<div><span class="matname">' + esc(m.material_name) + "</span>" +
@@ -1334,7 +1463,8 @@ function renderDetail() {
     galleryHtml = '<div class="gallery">';
     photos.forEach((u, i) => {
       galleryHtml += '<div class="gcard">' +
-        '<div class="gimg"><img src="' + esc(photoSrc(u)) + '" alt="" onerror="this.style.display=\'none\'" /></div>' +
+        '<div class="gimg"><img src="' + esc(photoSrc(u)) + '" alt="" data-zoom="' + esc(photoSrc(u)) +
+          '" onerror="this.style.display=\'none\'" /></div>' +
         '<div class="gacts">' +
           '<button class="minibtn" data-iw="' + i + '">書き込む</button>' +
           '<button class="minibtn" data-ix="' + i + '" style="color:#B5552F">削除</button>' +
@@ -1381,6 +1511,9 @@ function renderDetail() {
   };
   document.getElementById("ipick").onclick = () => setPhoto("item", cur.item, false);
   document.getElementById("icam").onclick = () => setPhoto("item", cur.item, true);
+  el.querySelectorAll("[data-zoom]").forEach(img =>
+    img.onclick = () => openLightbox(img.dataset.zoom));
+
   el.querySelectorAll("[data-iw]").forEach(b =>
     b.onclick = () => annotateExisting("item", cur.item, Number(b.dataset.iw)));
   el.querySelectorAll("[data-ix]").forEach(b =>
