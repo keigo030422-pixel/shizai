@@ -404,7 +404,6 @@ function annotateImage(src, existing) {
             '<button class="esize" data-size="11">太</button>' +
           '</span>' +
           '<button class="ebtn" id="eundo">戻す</button>' +
-          '<button class="ebtn" id="etext">文字を直す</button>' +
           '<button class="ebtn" id="edel" style="color:#B5552F">選択を削除</button>' +
           '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
@@ -469,7 +468,7 @@ function annotateImage(src, existing) {
       if (!el) return;
       if (sel >= 0) {
         el.innerHTML = '<b style="color:#1971C2">編集中</b> — ドラッグで移動、青い丸で大きさ、緑の丸で回転。' +
-          (strokes[sel] && strokes[sel].type === "text" ? '文字は「文字を直す」で打ち直せます。' : "") +
+          (strokes[sel] && strokes[sel].type === "text" ? '文字はもう一度タップで打ち直せます。' : "") +
           '何もない所をタップすると選択を解除します。';
       } else {
         el.innerHTML = '<b style="color:#2F9E44">追加できます</b> — ' +
@@ -918,14 +917,6 @@ function annotateImage(src, existing) {
       if (sel >= 0) { strokes[sel].size = size; redraw(); }
     });
     wrap.querySelector("#eundo").onclick = () => { strokes.pop(); sel = -1; redraw(); };
-    wrap.querySelector("#etext").onclick = () => {
-      if (sel < 0 || strokes[sel].type !== "text") {
-        alert("直したい文字をタップして選んでから押してください。");
-        return;
-      }
-      openTextInput({ x:strokes[sel].x1, y:strokes[sel].y1 }, sel);
-    };
-
     wrap.querySelector("#edel").onclick = () => {
       if (sel < 0) { alert("消したい書き込みをタップして選んでから押してください。"); return; }
       strokes.splice(sel, 1);
