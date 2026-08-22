@@ -409,7 +409,7 @@ function annotateImage(src, existing) {
           '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
         '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
-        '<p class="ehint">白い余白にも書き込めます。「文字」で画像をタップするとその場で入力(Enterで確定)。書いたものはタップで選択 → ドラッグで移動、青い丸で大きさ、緑の丸で回転。文字を打ち直すときは選んでから「文字を直す」。</p>' +
+        '<p class="ehint" id="ehint"></p>' +
         '<div class="eactions">' +
           '<button class="btn" id="ecancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>' +
           '<button class="btn" id="edone" style="background:#3F7D4A">この内容で登録</button>' +
@@ -464,8 +464,24 @@ function annotateImage(src, existing) {
       canvas.height = imgH + PAD * 2;
     }
 
+    function updateHint() {
+      const el = wrap.querySelector("#ehint");
+      if (!el) return;
+      if (sel >= 0) {
+        el.innerHTML = '<b style="color:#1971C2">編集中</b> — ドラッグで移動、青い丸で大きさ、緑の丸で回転。' +
+          (strokes[sel] && strokes[sel].type === "text" ? '文字は「文字を直す」で打ち直せます。' : "") +
+          '何もない所をタップすると選択を解除します。';
+      } else {
+        el.innerHTML = '<b style="color:#2F9E44">追加できます</b> — ' +
+          (tool === "text" ? "画像をタップするとその場で入力できます(Enterで確定)。"
+                           : "画像をドラッグすると" + (tool === "arrow" ? "矢印" : "囲み") + "を描けます。") +
+          "白い余白にも書けます。書いたものをタップすると編集できます。";
+      }
+    }
+
     function redraw() {
       if (!baseReady) return;
+      updateHint();
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, PAD, PAD, imgW, imgH);
@@ -794,8 +810,15 @@ function annotateImage(src, existing) {
         return;
       }
 
-      // 3. empty space => deselect and start a new mark
-      sel = -1;
+      // 3. empty space. While something is selected the canvas is in "edit"
+      // mode: this tap only clears the selection, so a slightly-off grab never
+      // turns into an unwanted new mark. Drawing resumes on the next tap, once
+      // nothing is selected.
+      if (sel >= 0) {
+        sel = -1;
+        redraw();
+        return;
+      }
       if (tool === "text") {
         openTextInput(p, null);
         return;
