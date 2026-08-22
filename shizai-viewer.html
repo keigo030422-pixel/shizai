@@ -117,6 +117,9 @@
            color:#2B2A24; font-size:26px; line-height:1; cursor:pointer; z-index:2; }
   .lbprev { left:10px; }
   .lbnext { right:10px; }
+  .lbfit { position:absolute; top:14px; left:16px; padding:9px 14px;
+           border-radius:999px; border:none; background:rgba(255,255,255,.9);
+           color:#2B2A24; font-size:13px; font-weight:600; cursor:pointer; z-index:2; }
   .gacts { display:flex; gap:6px; margin-top:6px; }
   .gacts .minibtn { flex:1; text-align:center; }
   .editor-bg { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:80;
@@ -1076,6 +1079,7 @@ function openLightbox(list, start) {
   bg.className = "lightbox";
   bg.innerHTML =
     '<button class="lbclose" aria-label="閉じる">✕</button>' +
+    '<button class="lbfit">画面いっぱい</button>' +
     '<button class="lbnav lbprev" aria-label="前へ">‹</button>' +
     '<button class="lbnav lbnext" aria-label="次へ">›</button>' +
     '<div class="lbstage"><img alt="" /></div>' +
@@ -1087,6 +1091,20 @@ function openLightbox(list, start) {
   const countEl = bg.querySelector(".lbcount");
   const prevEl = bg.querySelector(".lbprev");
   const nextEl = bg.querySelector(".lbnext");
+  const fitEl = bg.querySelector(".lbfit");
+
+  // A photo rarely matches the phone's aspect ratio, so showing all of it
+  // always leaves black bars. This toggle lets the picture fill the screen
+  // instead, trading the edges for size.
+  let filled = false;
+  fitEl.onclick = e => {
+    e.stopPropagation();
+    filled = !filled;
+    imgEl.style.objectFit = filled ? "cover" : "contain";
+    imgEl.style.width = filled ? "100%" : "auto";
+    imgEl.style.height = filled ? "100%" : "auto";
+    fitEl.textContent = filled ? "全体を表示" : "画面いっぱい";
+  };
 
   function show() {
     const p = asPhoto(photos[i]);
