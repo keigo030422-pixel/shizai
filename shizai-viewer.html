@@ -667,6 +667,11 @@ function annotateImage(src, existing) {
     // over the canvas at the tap point, sized and coloured like the final mark,
     // so what you type is what you see. Committed on blur or Enter.
     let liveText = null;
+    // Tapping the canvas first blurs the live textarea, which commits the text
+    // and clears liveText — so by the time the tap reaches start() the guard is
+    // already gone. This timestamp lets that first tap count only as "finish
+    // typing" instead of also opening a new text box.
+    let committedAt = 0;
 
     function openTextInput(canvasPt, existingIdx) {
       if (liveText) return;
@@ -714,6 +719,7 @@ function annotateImage(src, existing) {
       const { el, pt, idx } = liveText;
       const txt = el.value.replace(/\s+$/, "");
       liveText = null;
+      committedAt = Date.now();
       if (el.parentNode) el.parentNode.removeChild(el);
 
       if (idx != null) {
@@ -747,7 +753,8 @@ function annotateImage(src, existing) {
 
     function start(e) {
       if (!baseReady) return;
-      if (liveText) { commitText(); return; }   // finish typing first
+      if (liveText) { commitText(); return; }          // finish typing first
+      if (Date.now() - committedAt < 400) return;      // that tap only confirmed
       e.preventDefault();
       const p = pos(e);
       downAt = p;
