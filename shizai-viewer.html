@@ -1359,14 +1359,15 @@ function duplicateItemModal(srcItem) {
   });
 }
 
-function itemFormModal(existingItem) {
+function itemFormModal(existingItem, presetCat) {
   const cur = existingItem ? itemMap.get(existingItem) : null;
   const first = cur ? cur.materials[0] : null;
   openModal({
-    title: cur ? "品目を編集" : "品目を追加",
+    title: cur ? "品目を編集" : (presetCat ? presetCat + " に品目を追加" : "品目を追加"),
     fields: [
       { key:"item", label:"品目名", value: cur ? cur.item : "", required:true },
-      { key:"category", label:"商品分類", value: cur ? (cur.category||"") : "", list: allCats() },
+      { key:"category", label:"商品分類",
+        value: cur ? (cur.category||"") : (presetCat || ""), list: allCats() },
       { key:"sale_type", label:"販売区分", value: first ? (first.sale_type||"通常") : "通常",
         list:["通常","レギュラー","予定数","IDF"] },
       { key:"memo", label:"メモ(任意)", value: cur ? (cur.memo||"") : "", textarea:true },
@@ -2176,12 +2177,17 @@ function renderList() {
   const el = document.getElementById("list");
   el.innerHTML = "";
 
+  // When a category filter is on, a new item almost certainly belongs to it,
+  // so pre-fill that category rather than making it be picked again.
+  const addCat = activeCat !== "全て" ? activeCat : "";
   const add = document.createElement("button");
   add.className = "item-btn";
   add.style.color = "#3F7D4A";
   add.style.fontWeight = "600";
-  add.innerHTML = '<span class="left">＋ 品目を追加</span>';
-  add.onclick = () => itemFormModal(null);
+  add.innerHTML = '<span class="left">＋ 品目を追加' +
+    (addCat ? '<span style="font-weight:400;color:#8A8371">（' + esc(addCat) + '）</span>' : "") +
+    "</span>";
+  add.onclick = () => itemFormModal(null, addCat);
   el.appendChild(add);
 
   const pool = filtered();
