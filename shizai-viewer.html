@@ -12,6 +12,22 @@
   .header { background:#EAE6D9; border-bottom:1px solid #D8D2C0; padding:14px 16px; }
   .header h1 { margin:0 0 2px; font-size:17px; }
   .header p { margin:0; font-size:11px; color:#8A8371; }
+  .cat-head { justify-content:space-between; }
+  .sortbtn { font-size:10px; padding:3px 8px; border-radius:6px; background:#fff;
+             border:1px solid currentColor; cursor:pointer; font-weight:600; }
+  .grip { color:#B5AF9E; margin-right:8px; font-size:15px; cursor:grab; }
+  .hidetag { font-size:10px; background:#E3DFD1; color:#6B6558; padding:2px 6px;
+             border-radius:4px; margin-left:8px; }
+  .dragrow { touch-action:none; }
+  .dragrow.dragging { background:#EFEDE4; opacity:.85; }
+  .viewtabs { display:flex; gap:6px; margin-top:8px; }
+  .vtab { flex:1; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:600;
+          background:#fff; border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
+  .vtab.active { background:#3F7D4A; color:#fff; border-color:#3F7D4A; }
+  .mrow { padding:11px 14px; border-bottom:1px solid #E3DFD1; background:#fff;
+          display:flex; gap:10px; align-items:flex-start; }
+  .mrow .matthumb { cursor:zoom-in; }
+  .muses { font-size:11px; color:#9A9382; margin-top:3px; }
   .search-wrap { padding:10px 12px; background:#EAE6D9; border-bottom:1px solid #D8D2C0; }
   .search-wrap input { width:100%; padding:9px 12px; border-radius:8px;
                        border:1px solid #D8D2C0; font-size:14px; }
@@ -186,6 +202,10 @@
       <h1>品目別 資材ビューア</h1>
       <p>商品を選ぶと使用資材が一覧表示されます</p>
       <p style="margin-top:3px">※ 登録内容は全員に共有されます</p>
+      <div class="viewtabs">
+        <button id="tabitems" class="vtab active">品目から見る</button>
+        <button id="tabmats" class="vtab">資材マスタ</button>
+      </div>
       <button id="showbin" class="minibtn" style="margin-top:6px">保存先IDを表示</button>
       <p id="binout" style="margin-top:5px; font-family:monospace; font-size:11px;
          word-break:break-all; color:#3F7D4A"></p>
@@ -253,6 +273,10 @@ let busy = false;
 let status = null;
 let modal = null;
 let pendingCats = [];   // categories created but with no items yet
+let view = "items";     // "items" | "materials"
+let showHidden = false; // reveal items marked hidden
+let arrangeCat = null;  // category currently being reordered
+let selectedMat = null; // material name shown in the master view
 
 function newId() { return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -262,15 +286,43 @@ function buildItems() {
   for (const r of rows) {
     if (!r.item) continue;
     if (!map.has(r.item)) {
-      map.set(r.item, { item:r.item, category:r.category, saleTypes:new Set(), materials:[], memo:"" });
+      map.set(r.item, {
+        item:r.item, category:r.category, saleTypes:new Set(), materials:[], memo:"",
+        order: (typeof r.order === "number") ? r.order : null,
+        hidden: !!r.hidden
+      });
     }
     const e = map.get(r.item);
     if (r.category && !e.category) e.category = r.category;
     if (r.sale_type) e.saleTypes.add(r.sale_type);
     if (r.memo && !e.memo) e.memo = r.memo;
+    if (typeof r.order === "number" && e.order == null) e.order = r.order;
+    if (r.hidden) e.hidden = true;
     e.materials.push(r);
   }
   return map;
+}
+
+// Sort within a category: explicit order first, then anything not yet
+// positioned, keeping its original data order.
+function sortInCat(list) {
+  return list.slice().sort((a, b) => {
+    const ao = a.order == null ? Infinity : a.order;
+    const bo = b.order == null ? Infinity : b.order;
+    if (ao !== bo) return ao - bo;
+    return 0;
+  });
+}
+
+// Write positions back onto every row of each item in a category.
+function applyOrder(catName, orderedNames) {
+  orderedNames.forEach((name, idx) => {
+    for (const r of rows) if (r.item === name) r.order = idx;
+  });
+}
+
+function setHidden(itemName, val) {
+  for (const r of rows) if (r.item === itemName) r.hidden = val;
 }
 let itemMap = new Map();
 function refreshItems() {
@@ -1331,6 +1383,112 @@ function knownMaterials() {
   return [...map.values()].sort((a,b) => b.uses - a.uses || a.material_name.localeCompare(b.material_name, "ja"));
 }
 
+// Editing from the master rewrites every row using this material, so the
+// change is reflected in all the items that use it.
+function masterMaterialModal(info) {
+  const matCats = [...new Set(rows.map(r => r.material_category).filter(Boolean))];
+  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))];
+  openModal({
+    title: info ? "資材を編集" : "資材を追加",
+    message: info ? ("この資材を使っている品目すべてに反映されます。") : "",
+    fields: [
+      { key:"material_name", label:"資材名・型番", value: info ? info.material_name : "", required:true },
+      { key:"material_category", label:"資材区分", value: info ? info.material_category : "", list: matCats },
+      { key:"supplier", label:"仕入先", value: info ? info.supplier : "", list: suppliers },
+      { key:"common_or_dedicated", label:"共通/専用", value: info ? (info.common_or_dedicated || "共通") : "共通",
+        list:["共通","専用"] }
+    ],
+    onSubmit: async vals => {
+      const name = vals.material_name.trim();
+      if (!name) throw new Error("資材名を入力してください");
+      const exists = knownMaterials().some(m => m.material_name === name);
+      if (!info && exists) throw new Error("その資材はすでにあります");
+      if (info && name !== info.material_name && exists) throw new Error("その資材名はすでにあります");
+
+      await withSave(async () => {
+        if (!info) {
+          // A material with no item yet is parked on a holder row so it shows
+          // up in the master and in the picker until it gets used.
+          rows.push({
+            id: newId(), item: "", category: "",
+            sale_type: "", material_category: vals.material_category.trim() || "未分類",
+            material_name: name, supplier: vals.supplier.trim(),
+            common_or_dedicated: vals.common_or_dedicated.trim(), memo: ""
+          });
+        } else {
+          const old = info.material_name;
+          for (const r of rows) {
+            if (r.material_name === old) {
+              r.material_name = name;
+              r.material_category = vals.material_category.trim() || "未分類";
+              r.supplier = vals.supplier.trim();
+              r.common_or_dedicated = vals.common_or_dedicated.trim();
+            }
+          }
+          if (old !== name && matPhotos[old]) {
+            matPhotos[name] = matPhotos[old];
+            delete matPhotos[old];
+          }
+        }
+        selectedMat = name;
+      }, info ? "資材を更新しました" : "資材を追加しました");
+    }
+  });
+}
+
+function duplicateMaterialModal(info) {
+  const matCats = [...new Set(rows.map(r => r.material_category).filter(Boolean))];
+  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))];
+  openModal({
+    title: "資材を複製",
+    message: "「" + info.material_name + "」の内容をコピーして新しい資材を作ります。",
+    fields: [
+      { key:"material_name", label:"新しい資材名", value: info.material_name + " のコピー", required:true },
+      { key:"material_category", label:"資材区分", value: info.material_category, list: matCats },
+      { key:"supplier", label:"仕入先", value: info.supplier, list: suppliers },
+      { key:"common_or_dedicated", label:"共通/専用", value: info.common_or_dedicated || "共通", list:["共通","専用"] },
+      { key:"copyPhoto", label:"写真もコピーする", value: matPhotos[info.material_name] ? "はい" : "いいえ",
+        list:["はい","いいえ"] }
+    ],
+    onSubmit: async vals => {
+      const name = vals.material_name.trim();
+      if (!name) throw new Error("資材名を入力してください");
+      if (knownMaterials().some(m => m.material_name === name)) throw new Error("その資材名はすでにあります");
+      await withSave(async () => {
+        rows.push({
+          id: newId(), item: "", category: "",
+          sale_type: "", material_category: vals.material_category.trim() || "未分類",
+          material_name: name, supplier: vals.supplier.trim(),
+          common_or_dedicated: vals.common_or_dedicated.trim(), memo: ""
+        });
+        if (vals.copyPhoto.trim() === "はい" && matPhotos[info.material_name]) {
+          const e = asPhoto(matPhotos[info.material_name]);
+          matPhotos[name] = { base:e.base, display:e.display, marks:e.marks, note:e.note };
+        }
+        selectedMat = name;
+      }, "資材を複製しました");
+    }
+  });
+}
+
+function removeMaterialModal(info, useCount) {
+  openModal({
+    title: "資材を削除",
+    message: useCount
+      ? "この資材は " + useCount + " 品目で使われています。削除するとその品目からも外れます。"
+      : "この資材を削除します。",
+    fields: [],
+    danger: true,
+    onSubmit: async () => {
+      await withSave(async () => {
+        rows = rows.filter(r => r.material_name !== info.material_name);
+        delete matPhotos[info.material_name];
+        selectedMat = null;
+      }, "資材を削除しました");
+    }
+  });
+}
+
 function materialFormModal(existingRow) {
   const cur = itemMap.get(selected);
   const matCats = [...new Set(rows.map(r => r.material_category).filter(Boolean))];
@@ -1469,12 +1627,155 @@ function renderModal() {
 // ---------- render ----------
 function filtered() {
   let pool = [...itemMap.values()];
+  if (!showHidden) pool = pool.filter(i => !i.hidden);
   if (activeCat !== "全て") pool = pool.filter(i => (i.category || "その他") === activeCat);
   if (query.trim()) {
     const q = query.trim().toLowerCase();
     pool = pool.filter(i => i.item.toLowerCase().includes(q));
   }
   return pool;
+}
+
+// ---------- material master ----------
+// Materials have no records of their own: they exist as the rows attached to
+// items. Editing one here therefore rewrites every row carrying that name, so
+// a change shows up in all the items that use it.
+function renderMatList() {
+  const el = document.getElementById("list");
+  el.innerHTML = "";
+
+  const add = document.createElement("button");
+  add.className = "item-btn";
+  add.style.color = "#3F7D4A";
+  add.style.fontWeight = "600";
+  add.innerHTML = '<span class="left">＋ 資材を追加</span>';
+  add.onclick = () => masterMaterialModal(null);
+  el.appendChild(add);
+
+  let mats = knownMaterials();
+  if (query.trim()) {
+    const q = query.trim().toLowerCase();
+    mats = mats.filter(m =>
+      m.material_name.toLowerCase().includes(q) ||
+      (m.material_category || "").toLowerCase().includes(q) ||
+      (m.supplier || "").toLowerCase().includes(q));
+  }
+  if (!mats.length) {
+    el.insertAdjacentHTML("beforeend",
+      '<div style="padding:24px;text-align:center;font-size:13px;color:#9A9382">該当する資材がありません</div>');
+    return;
+  }
+
+  const byCat = new Map();
+  for (const m of mats) {
+    const k = m.material_category || "未分類";
+    if (!byCat.has(k)) byCat.set(k, []);
+    byCat.get(k).push(m);
+  }
+  for (const [k, list] of byCat) {
+    const h = document.createElement("div");
+    h.className = "cat-head";
+    h.style.color = "#5A5648";
+    h.innerHTML = '<span class="dot" style="background:#8A8371"></span>' + esc(k);
+    el.appendChild(h);
+    for (const m of list) {
+      const b = document.createElement("button");
+      b.className = "item-btn";
+      if (selectedMat === m.material_name) {
+        b.style.background = "#fff";
+        b.style.color = "#2B2A24";
+        b.style.fontWeight = "600";
+        b.style.borderLeftColor = "#5A5648";
+      }
+      const ph = photoSrc(matPhotos[m.material_name]);
+      const th = ph ? '<img class="thumb" src="' + esc(ph) + '" onerror="this.style.display=\'none\'" />' : "";
+      b.innerHTML = '<span class="left">' + th + esc(m.material_name) +
+                    '</span><span class="count">' + m.uses + "</span>";
+      b.onclick = () => {
+        selectedMat = m.material_name;
+        status = null;
+        if (window.innerWidth < 768) {
+          document.getElementById("sidebar").classList.add("hidden");
+          document.getElementById("main").classList.remove("hidden");
+        }
+        render();
+      };
+      el.appendChild(b);
+    }
+  }
+}
+
+function renderMatDetail() {
+  const el = document.getElementById("main");
+  const info = knownMaterials().find(m => m.material_name === selectedMat);
+  if (!info) {
+    el.innerHTML = '<div class="detail"><p style="color:#9A9382;font-size:14px">左のリストから資材を選ぶか、「＋ 資材を追加」で登録してください。</p></div>';
+    return;
+  }
+  const users = [...itemMap.values()]
+    .filter(i => i.materials.some(m => m.material_name === selectedMat));
+  const ph = photoSrc(matPhotos[selectedMat]);
+  const isCommon = info.common_or_dedicated === "共通";
+
+  const imgHtml = ph
+    ? '<div class="gimg"><img src="' + esc(ph) + '" alt="" data-mzoom="' + esc(selectedMat) +
+      '" onerror="this.style.display=\'none\'" /></div>'
+    : '<div class="gimg"><span style="font-size:12px;color:#9A9382">写真未登録</span></div>';
+
+  el.innerHTML =
+    '<div class="detail">' +
+      '<button class="back-btn" style="color:#5A5648" id="back">← 一覧に戻る</button>' +
+      '<div class="badges">' +
+        '<span class="badge plain">' + esc(info.material_category || "未分類") + "</span>" +
+        (info.common_or_dedicated
+          ? '<span class="badge" style="background:' + (isCommon ? "#E7F1E4" : "#FDECE4") +
+            ';color:' + (isCommon ? "#3F7D4A" : "#B5552F") + '">' + esc(info.common_or_dedicated) + "</span>"
+          : "") +
+      "</div>" +
+      imgHtml +
+      (status ? '<div class="status ' + status.type + '">' + esc(status.msg) + "</div>" : "") +
+      '<div class="btnrow">' +
+        '<button class="btn" id="mpick" style="background:#5A5648' + (busy ? ";opacity:.6;pointer-events:none" : "") + '">' +
+          (busy ? "処理中..." : "写真を選ぶ") + "</button>" +
+        '<button class="btn outline" id="mcam" style="color:#5A5648' + (busy ? ";opacity:.6;pointer-events:none" : "") + '">カメラ</button>' +
+      "</div>" +
+      (ph ? '<div class="btnrow">' +
+              '<button class="btn outline" id="mwrite" style="color:#5A5648">書き込む</button>' +
+              '<button class="btn ghost" id="mdel">写真を削除</button>' +
+            "</div>" : "") +
+      '<h2 class="title">' + esc(selectedMat) + "</h2>" +
+      '<p class="meta">仕入先: ' + esc(info.supplier || "未登録") + " ・ " + users.length + " 品目で使用</p>" +
+      '<div class="addbar">' +
+        '<button class="minibtn" id="medit">資材を編集</button>' +
+        '<button class="minibtn" id="mdup">この資材を複製</button>' +
+        '<button class="minibtn" id="mremove" style="color:#B5552F">資材を削除</button>' +
+      "</div>" +
+      '<div class="matgroup">' +
+        '<div class="gh" style="background:#EFEDE4;color:#5A5648">この資材を使っている品目</div>' +
+        (users.length
+          ? users.map(u => '<div class="matrow"><div class="matbody">' +
+              '<span class="matname">' + esc(u.item) + "</span>" +
+              '<div class="supplier">' + esc(u.category || "その他") + "</div></div></div>").join("")
+          : '<div class="matrow"><div class="matbody"><span class="supplier">まだどの品目にも使われていません</span></div></div>') +
+      "</div>" +
+    "</div>";
+
+  const back = document.getElementById("back");
+  if (back) back.onclick = () => {
+    document.getElementById("sidebar").classList.remove("hidden");
+    document.getElementById("main").classList.add("hidden");
+  };
+  el.querySelectorAll("[data-mzoom]").forEach(img =>
+    img.onclick = () => openLightbox([matPhotos[img.dataset.mzoom]], 0));
+  document.getElementById("mpick").onclick = () => setPhoto("mat", selectedMat, false);
+  document.getElementById("mcam").onclick = () => setPhoto("mat", selectedMat, true);
+  const mw = document.getElementById("mwrite");
+  if (mw) mw.onclick = () => annotateExisting("mat", selectedMat, 0);
+  const md = document.getElementById("mdel");
+  if (md) md.onclick = () => clearPhoto("mat", selectedMat);
+  document.getElementById("medit").onclick = () => masterMaterialModal(info);
+  document.getElementById("mdup").onclick = () => duplicateMaterialModal(info);
+  document.getElementById("mremove").onclick = () => removeMaterialModal(info, users.length);
 }
 
 function renderCats() {
@@ -1499,6 +1800,16 @@ function renderCats() {
     edit.onclick = () => categoryFormModal(activeCat);
     el.appendChild(edit);
   }
+  const hiddenCount = [...itemMap.values()].filter(i => i.hidden).length;
+  if (hiddenCount) {
+    const t = document.createElement("button");
+    t.className = "cat-btn" + (showHidden ? " active" : "");
+    t.textContent = (showHidden ? "非表示を隠す" : "非表示も表示") + " (" + hiddenCount + ")";
+    if (showHidden) t.style.background = "#8A8371";
+    t.onclick = () => { showHidden = !showHidden; render(); };
+    el.appendChild(t);
+  }
+
   const add = document.createElement("button");
   add.className = "cat-btn";
   add.textContent = "＋ 分類を追加";
@@ -1533,33 +1844,109 @@ function renderList() {
     byCat.get(c).push(i);
   }
   for (const [c, list] of byCat) {
+    const arranging = arrangeCat === c;
     const h = document.createElement("div");
     h.className = "cat-head";
     h.style.color = color(c);
     h.innerHTML = '<span class="dot" style="background:' + color(c) + '"></span>' + esc(c);
+    const sortBtn = document.createElement("button");
+    sortBtn.className = "sortbtn";
+    sortBtn.textContent = arranging ? "並び替え終了" : "並び替え";
+    sortBtn.style.color = color(c);
+    sortBtn.style.borderColor = color(c);
+    sortBtn.onclick = e => {
+      e.stopPropagation();
+      arrangeCat = arranging ? null : c;
+      render();
+    };
+    h.appendChild(sortBtn);
     el.appendChild(h);
-    for (const i of list) {
+
+    const sorted = sortInCat(list);
+    for (const i of sorted) {
       const b = document.createElement("button");
-      b.className = "item-btn";
-      if (selected === i.item) {
+      b.className = "item-btn" + (arranging ? " dragrow" : "");
+      b.dataset.item = i.item;
+      if (i.hidden) b.style.opacity = "0.45";
+      if (selected === i.item && !arranging) {
         b.style.background = "#fff"; b.style.color = "#2B2A24";
         b.style.fontWeight = "600"; b.style.borderLeftColor = color(c);
       }
       const firstPhoto = photoSrc(photosOf(i.item)[0]);
       const th = firstPhoto
         ? '<img class="thumb" src="' + esc(firstPhoto) + '" onerror="this.style.display=\'none\'" />' : "";
-      b.innerHTML = '<span class="left">' + th + esc(i.item) + '</span><span class="count">' + i.materials.length + "</span>";
-      b.onclick = () => {
-        selected = i.item; status = null;
-        if (window.innerWidth < 768) {
-          document.getElementById("sidebar").classList.add("hidden");
-          document.getElementById("main").classList.remove("hidden");
-        }
-        render();
-      };
+      const grip = arranging ? '<span class="grip">☰</span>' : "";
+      const eye = i.hidden ? '<span class="hidetag">非表示</span>' : "";
+      b.innerHTML = '<span class="left">' + grip + th + esc(i.item) + eye +
+                    '</span><span class="count">' + i.materials.length + "</span>";
+      if (arranging) {
+        b.draggable = true;
+        attachDrag(b, el, c);
+      } else {
+        b.onclick = () => {
+          selected = i.item; status = null;
+          if (window.innerWidth < 768) {
+            document.getElementById("sidebar").classList.add("hidden");
+            document.getElementById("main").classList.remove("hidden");
+          }
+          render();
+        };
+      }
       el.appendChild(b);
     }
   }
+}
+
+// Drag-to-reorder, working with both mouse and touch. The row follows the
+// finger and swaps places with whatever it is dragged over; on release the
+// new order is written back to the rows and saved.
+function attachDrag(node, listEl, catName) {
+  let dragging = false, placeholderNext = null;
+
+  function rowsInCat() {
+    return [...listEl.querySelectorAll(".dragrow")];
+  }
+  function commit() {
+    const names = rowsInCat().map(n => n.dataset.item);
+    withSave(async () => { applyOrder(catName, names); }, "並び順を保存しました");
+  }
+  function moveTo(clientY) {
+    const others = rowsInCat().filter(n => n !== node);
+    for (const o of others) {
+      const r = o.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (clientY < mid) { listEl.insertBefore(node, o); return; }
+    }
+    const last = others[others.length - 1];
+    if (last) listEl.insertBefore(node, last.nextSibling);
+  }
+
+  node.addEventListener("dragstart", e => {
+    dragging = true;
+    node.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", node.dataset.item); } catch (err) {}
+  });
+  node.addEventListener("dragover", e => e.preventDefault());
+  node.addEventListener("drag", e => { if (e.clientY) moveTo(e.clientY); });
+  node.addEventListener("dragend", () => {
+    node.classList.remove("dragging");
+    if (dragging) { dragging = false; commit(); }
+  });
+
+  let touching = false;
+  node.addEventListener("touchstart", () => { touching = true; node.classList.add("dragging"); }, { passive:true });
+  node.addEventListener("touchmove", e => {
+    if (!touching) return;
+    e.preventDefault();
+    moveTo(e.touches[0].clientY);
+  }, { passive:false });
+  node.addEventListener("touchend", () => {
+    if (!touching) return;
+    touching = false;
+    node.classList.remove("dragging");
+    commit();
+  });
 }
 
 function renderDetail() {
@@ -1653,6 +2040,7 @@ function renderDetail() {
         '<button class="minibtn" id="addmat" style="border-color:' + c + ';color:' + c + '">＋ 資材を追加</button>' +
         '<button class="minibtn" id="edititem">品目を編集</button>' +
         '<button class="minibtn" id="dupitem">この品目を複製</button>' +
+        '<button class="minibtn" id="hideitem">' + (cur.hidden ? "再表示する" : "非表示にする") + "</button>" +
         '<button class="minibtn" id="delitem" style="color:#B5552F">品目を削除</button>' +
       "</div>" +
       matHtml +
@@ -1680,6 +2068,11 @@ function renderDetail() {
   document.getElementById("addmat").onclick = () => materialFormModal(null);
   document.getElementById("edititem").onclick = () => itemFormModal(cur.item);
   document.getElementById("dupitem").onclick = () => duplicateItemModal(cur.item);
+  document.getElementById("hideitem").onclick = () => {
+    const to = !cur.hidden;
+    withSave(async () => { setHidden(cur.item, to); },
+      to ? "非表示にしました" : "再表示しました");
+  };
   document.getElementById("delitem").onclick = () => confirmModal(
     "品目を削除", "「" + cur.item + "」と、その資材" + cur.materials.length + "件をすべて削除します。よろしいですか?",
     async () => {
@@ -1709,9 +2102,39 @@ function renderDetail() {
   });
 }
 
-function render() { renderCats(); renderList(); renderDetail(); renderModal(); }
+function render() {
+  const isMats = view === "materials";
+  document.getElementById("cats").style.display = isMats ? "none" : "";
+  document.getElementById("tabitems").className = "vtab" + (isMats ? "" : " active");
+  document.getElementById("tabmats").className = "vtab" + (isMats ? " active" : "");
+  document.getElementById("search").placeholder = isMats ? "資材名で検索..." : "品目名で検索...";
+  if (isMats) { renderMatList(); renderMatDetail(); }
+  else { renderCats(); renderList(); renderDetail(); }
+  renderModal();
+}
 
-document.getElementById("search").addEventListener("input", e => { query = e.target.value; renderList(); });
+function switchView(v) {
+  if (view === v) return;
+  view = v;
+  query = "";
+  status = null;
+  const s = document.getElementById("search");
+  if (s) s.value = "";
+  // back to the list pane on phones, since the detail may not apply any more
+  if (window.innerWidth < 768) {
+    document.getElementById("sidebar").classList.remove("hidden");
+    document.getElementById("main").classList.add("hidden");
+  }
+  render();
+}
+
+document.getElementById("tabitems").addEventListener("click", () => switchView("items"));
+document.getElementById("tabmats").addEventListener("click", () => switchView("materials"));
+
+document.getElementById("search").addEventListener("input", e => {
+  query = e.target.value;
+  if (view === "materials") renderMatList(); else renderList();
+});
 
 document.getElementById("showbin").addEventListener("click", () => {
   const out = document.getElementById("binout");
