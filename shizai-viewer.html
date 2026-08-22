@@ -59,7 +59,7 @@
   .matgroup .gh { padding:9px 14px; font-size:13px; font-weight:bold; }
   .matrow { padding:11px 14px; border-top:1px solid #F0EDE2; display:flex; gap:10px; align-items:flex-start; }
   .matgroup .matrow:first-of-type { border-top:none; }
-  .matthumb { width:52px; height:52px; border-radius:6px; object-fit:cover;
+  .matthumb { width:52px; height:52px; border-radius:6px; object-fit:contain;
               border:1px solid #E3DFD1; flex-shrink:0; background:#F7F5EE; }
   .matthumb.empty { display:flex; align-items:center; justify-content:center;
                     font-size:10px; color:#B5AF9E; text-align:center; line-height:1.2; }
@@ -90,10 +90,11 @@
   .addbar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
   .gallery { display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; }
   .gcard { flex:0 0 auto; width:190px; }
-  .gimg { width:190px; height:190px; background:#fff; border:1px solid #D8D2C0;
+  .gimg { width:190px; height:190px; background:#FAF8F2; border:1px solid #D8D2C0;
           border-radius:12px; overflow:hidden; display:flex;
           align-items:center; justify-content:center; }
-  .gimg img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; }
+  .gimg img { max-width:100%; max-height:100%; width:auto; height:auto;
+              object-fit:contain; cursor:zoom-in; }
   .matthumb { cursor:zoom-in; }
   .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:100;
               display:flex; flex-direction:column; align-items:center;
@@ -152,7 +153,7 @@
            border-bottom:1px solid #F0EDE2; cursor:pointer; }
   .pitem:last-child { border-bottom:none; }
   .pitem.sel { background:#E7F1E4; }
-  .pthumb { width:38px; height:38px; border-radius:5px; object-fit:cover;
+  .pthumb { width:38px; height:38px; border-radius:5px; object-fit:contain;
             border:1px solid #E3DFD1; flex-shrink:0; background:#F7F5EE; }
   .pthumb.empty { display:flex; align-items:center; justify-content:center;
                   font-size:9px; color:#B5AF9E; text-align:center; line-height:1.15; }
