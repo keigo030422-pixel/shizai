@@ -285,6 +285,19 @@ let view = "items";     // "items" | "materials"
 let showHidden = false; // reveal items marked hidden
 let arrangeCat = null;  // item category currently being reordered
 let arrangeMatCat = null; // material category currently being reordered
+let listScroll = 0;     // remembered scroll position of the list pane
+
+function rememberScroll() {
+  const el = document.getElementById("list");
+  if (el) listScroll = el.scrollTop;
+}
+// Restoring has to wait for the list to be rendered and laid out again,
+// otherwise there is nothing to scroll yet.
+function restoreScroll() {
+  const el = document.getElementById("list");
+  if (!el) return;
+  requestAnimationFrame(() => { el.scrollTop = listScroll; });
+}
 let picking = false;    // multi-select mode for showing/hiding in bulk
 let picked = new Set(); // item names ticked while picking
 let selectedMat = null; // material name shown in the master view
@@ -1884,6 +1897,7 @@ function renderMatList() {
         attachMatDrag(b, el);
       } else {
         b.onclick = () => {
+          rememberScroll();
           selectedMat = m.material_name;
           status = null;
           if (window.innerWidth < 768) {
@@ -2004,6 +2018,7 @@ function renderMatDetail() {
   if (back) back.onclick = () => {
     document.getElementById("sidebar").classList.remove("hidden");
     document.getElementById("main").classList.add("hidden");
+    restoreScroll();
   };
   el.querySelectorAll("[data-mzoom]").forEach(img =>
     img.onclick = () => openLightbox([matPhotos[img.dataset.mzoom]], 0));
@@ -2195,6 +2210,7 @@ function renderList() {
         attachDrag(b, el, c);
       } else {
         b.onclick = () => {
+          rememberScroll();
           selected = i.item; status = null;
           if (window.innerWidth < 768) {
             document.getElementById("sidebar").classList.add("hidden");
@@ -2363,6 +2379,7 @@ function renderDetail() {
   if (back) back.onclick = () => {
     document.getElementById("sidebar").classList.remove("hidden");
     document.getElementById("main").classList.add("hidden");
+    restoreScroll();
   };
   document.getElementById("ipick").onclick = () => setPhoto("item", cur.item, false);
   document.getElementById("icam").onclick = () => setPhoto("item", cur.item, true);
@@ -2467,6 +2484,7 @@ function switchView(v) {
   status = null;
   arrangeCat = null;
   arrangeMatCat = null;
+  listScroll = 0;   // different list entirely, so start at the top
   const s = document.getElementById("search");
   if (s) s.value = "";
   // back to the list pane on phones, since the detail may not apply any more
