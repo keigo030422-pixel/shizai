@@ -95,13 +95,25 @@
           align-items:center; justify-content:center; }
   .gimg img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; }
   .matthumb { cursor:zoom-in; }
-  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:100;
-              display:flex; align-items:center; justify-content:center; padding:16px; }
-  .lightbox img { max-width:100%; max-height:100%; object-fit:contain;
-                  border-radius:6px; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:100;
+              display:flex; flex-direction:column; align-items:center;
+              justify-content:center; padding:16px; }
+  .lbstage { flex:1; display:flex; align-items:center; justify-content:center;
+             width:100%; min-height:0; }
+  .lightbox img { max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; }
+  .lbfoot { width:100%; max-width:640px; flex-shrink:0; padding-top:12px; text-align:center; }
+  .lbnote { margin:0 0 6px; color:#fff; font-size:14px; line-height:1.6;
+            white-space:pre-line; background:rgba(255,255,255,.12);
+            padding:10px 14px; border-radius:8px; }
+  .lbcount { margin:0; color:rgba(255,255,255,.65); font-size:12px; }
   .lbclose { position:absolute; top:14px; right:16px; width:40px; height:40px;
              border-radius:999px; border:none; background:rgba(255,255,255,.9);
-             color:#2B2A24; font-size:18px; cursor:pointer; }
+             color:#2B2A24; font-size:18px; cursor:pointer; z-index:2; }
+  .lbnav { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px;
+           border-radius:999px; border:none; background:rgba(255,255,255,.85);
+           color:#2B2A24; font-size:26px; line-height:1; cursor:pointer; z-index:2; }
+  .lbprev { left:10px; }
+  .lbnext { right:10px; }
   .gacts { display:flex; gap:6px; margin-top:6px; }
   .gacts .minibtn { flex:1; text-align:center; }
   .editor-bg { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:80;
@@ -458,7 +470,7 @@ function annotateImage(src, existing) {
       const r = Math.min(maxW / w, maxH / h, 1);
       imgW = Math.round(w * r);
       imgH = Math.round(h * r);
-      PAD = Math.round(Math.max(56, Math.min(imgW, imgH) * 0.22));
+      PAD = 0;   // no margin: notes now live in the caption field instead
       canvas.width = imgW + PAD * 2;
       canvas.height = imgH + PAD * 2;
     }
@@ -484,11 +496,6 @@ function annotateImage(src, existing) {
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, PAD, PAD, imgW, imgH);
-      ctx.save();
-      ctx.strokeStyle = "#D8D2C0";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(PAD + 0.5, PAD + 0.5, imgW - 1, imgH - 1);
-      ctx.restore();
       const all = active ? strokes.concat([active]) : strokes;
       all.forEach((s, i) => {
         if (s.hidden) return;              // being retyped in the live box
@@ -969,10 +976,11 @@ function blobToUrlSrc(fileOrBlob) {
 // those are wrapped so they still show, but start with no editable marks.
 function asPhoto(v) {
   if (!v) return null;
-  if (typeof v === "string") return { base: v, display: v, marks: [] };
-  return { base: v.base, display: v.display || v.base, marks: v.marks || [] };
+  if (typeof v === "string") return { base: v, display: v, marks: [], note: "" };
+  return { base: v.base, display: v.display || v.base, marks: v.marks || [], note: v.note || "" };
 }
 function photoSrc(v) { const p = asPhoto(v); return p ? p.display : ""; }
+function photoNote(v) { const p = asPhoto(v); return p ? p.note : ""; }
 
 function getPhotoEntry(target, key, idx) {
   return target === "item" ? asPhoto(photosOf(key)[idx]) : asPhoto(matPhotos[key]);
@@ -1009,8 +1017,31 @@ async function annotateExisting(target, key, idx) {
   if (!result) return;
   await withSave(async () => {
     const displayUrl = result.marks.length ? await uploadImage(result.blob) : entry.base;
-    putPhotoEntry(target, key, idx, { base: entry.base, display: displayUrl, marks: result.marks });
+    putPhotoEntry(target, key, idx, {
+      base: entry.base, display: displayUrl, marks: result.marks, note: entry.note
+    });
   }, "書き込みを保存しました");
+}
+
+// Captions are shown only in the enlarged view, so they can be long without
+// crowding the thumbnails.
+async function editNote(target, key, idx) {
+  const entry = getPhotoEntry(target, key, idx);
+  if (!entry) return;
+  openModal({
+    title: "この写真の説明",
+    message: "拡大表示したときに写真の下に出ます。空欄にすると消えます。",
+    fields: [
+      { key:"note", label:"説明", value: entry.note || "", textarea:true }
+    ],
+    onSubmit: async vals => {
+      await withSave(async () => {
+        putPhotoEntry(target, key, idx, {
+          base: entry.base, display: entry.display, marks: entry.marks, note: vals.note.trim()
+        });
+      }, "説明を保存しました");
+    }
+  });
 }
 
 async function clearPhoto(target, key, idx) {
@@ -1025,15 +1056,63 @@ async function clearPhoto(target, key, idx) {
 
 // Full-screen photo viewer. Tapping any thumbnail opens the picture large,
 // with pinch-zoom left to the browser and a tap anywhere to close.
-function openLightbox(src) {
-  if (!src) return;
+// `list` is the set of photo entries to page through, `start` the one tapped.
+// Swiping left/right moves between them and each photo's note is shown below.
+function openLightbox(list, start) {
+  const photos = (list || []).filter(Boolean);
+  if (!photos.length) return;
+  let i = Math.max(0, Math.min(start || 0, photos.length - 1));
+
   const bg = document.createElement("div");
   bg.className = "lightbox";
   bg.innerHTML =
     '<button class="lbclose" aria-label="閉じる">✕</button>' +
-    '<img src="' + esc(src) + '" alt="" />';
-  bg.onclick = () => { if (bg.parentNode) document.body.removeChild(bg); };
+    '<button class="lbnav lbprev" aria-label="前へ">‹</button>' +
+    '<button class="lbnav lbnext" aria-label="次へ">›</button>' +
+    '<div class="lbstage"><img alt="" /></div>' +
+    '<div class="lbfoot"><p class="lbnote"></p><p class="lbcount"></p></div>';
   document.body.appendChild(bg);
+
+  const imgEl = bg.querySelector("img");
+  const noteEl = bg.querySelector(".lbnote");
+  const countEl = bg.querySelector(".lbcount");
+  const prevEl = bg.querySelector(".lbprev");
+  const nextEl = bg.querySelector(".lbnext");
+
+  function show() {
+    const p = asPhoto(photos[i]);
+    imgEl.src = p.display;
+    noteEl.textContent = p.note || "";
+    noteEl.style.display = p.note ? "block" : "none";
+    countEl.textContent = photos.length > 1 ? (i + 1) + " / " + photos.length : "";
+    prevEl.style.visibility = photos.length > 1 ? "visible" : "hidden";
+    nextEl.style.visibility = photos.length > 1 ? "visible" : "hidden";
+  }
+  function go(step) {
+    i = (i + step + photos.length) % photos.length;
+    show();
+  }
+  const close = () => { if (bg.parentNode) document.body.removeChild(bg); };
+
+  bg.onclick = e => { if (e.target === bg || e.target.classList.contains("lbstage")) close(); };
+  bg.querySelector(".lbclose").onclick = close;
+  prevEl.onclick = e => { e.stopPropagation(); go(-1); };
+  nextEl.onclick = e => { e.stopPropagation(); go(1); };
+
+  // horizontal swipe to page through
+  let sx = null, sy = null;
+  bg.addEventListener("touchstart", e => {
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive:true });
+  bg.addEventListener("touchend", e => {
+    if (sx == null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    sx = null;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+  }, { passive:true });
+
+  show();
 }
 
 // ---------- modals ----------
@@ -1424,7 +1503,7 @@ function renderDetail() {
       const isCommon = m.common_or_dedicated === "共通";
       const p = photoSrc(matPhotos[m.material_name]);
       const thumb = p
-        ? '<img class="matthumb" src="' + esc(p) + '" data-zoom="' + esc(p) +
+        ? '<img class="matthumb" src="' + esc(p) + '" data-mzoom="' + esc(m.material_name) +
           '" onerror="this.style.display=\'none\'" />'
         : '<div class="matthumb empty">写真<br>なし</div>';
       rowsHtml += '<div class="matrow">' + thumb + '<div class="matbody">' +
@@ -1454,10 +1533,11 @@ function renderDetail() {
     galleryHtml = '<div class="gallery">';
     photos.forEach((u, i) => {
       galleryHtml += '<div class="gcard">' +
-        '<div class="gimg"><img src="' + esc(photoSrc(u)) + '" alt="" data-zoom="' + esc(photoSrc(u)) +
+        '<div class="gimg"><img src="' + esc(photoSrc(u)) + '" alt="" data-izoom="' + i +
           '" onerror="this.style.display=\'none\'" /></div>' +
         '<div class="gacts">' +
           '<button class="minibtn" data-iw="' + i + '">書き込む</button>' +
+          '<button class="minibtn" data-in="' + i + '">説明' + (photoNote(u) ? "✓" : "") + "</button>" +
           '<button class="minibtn" data-ix="' + i + '" style="color:#B5552F">削除</button>' +
         "</div></div>";
     });
@@ -1502,8 +1582,12 @@ function renderDetail() {
   };
   document.getElementById("ipick").onclick = () => setPhoto("item", cur.item, false);
   document.getElementById("icam").onclick = () => setPhoto("item", cur.item, true);
-  el.querySelectorAll("[data-zoom]").forEach(img =>
-    img.onclick = () => openLightbox(img.dataset.zoom));
+  el.querySelectorAll("[data-izoom]").forEach(img =>
+    img.onclick = () => openLightbox(photos, Number(img.dataset.izoom)));
+  el.querySelectorAll("[data-mzoom]").forEach(img =>
+    img.onclick = () => openLightbox([matPhotos[img.dataset.mzoom]], 0));
+  el.querySelectorAll("[data-in]").forEach(b =>
+    b.onclick = () => editNote("item", cur.item, Number(b.dataset.in)));
 
   el.querySelectorAll("[data-iw]").forEach(b =>
     b.onclick = () => annotateExisting("item", cur.item, Number(b.dataset.iw)));
