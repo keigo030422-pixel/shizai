@@ -404,11 +404,12 @@ function annotateImage(src, existing) {
             '<button class="esize" data-size="11">太</button>' +
           '</span>' +
           '<button class="ebtn" id="eundo">戻す</button>' +
+          '<button class="ebtn" id="etext">文字を直す</button>' +
           '<button class="ebtn" id="edel" style="color:#B5552F">選択を削除</button>' +
           '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
         '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
-        '<p class="ehint">白い余白にも書き込めます。「文字」で画像をタップするとその場で入力できます(Enterで確定)。タップで選択 → ドラッグで移動、青い丸で大きさ、緑の丸で回転。文字はもう一度タップで書き直せます。</p>' +
+        '<p class="ehint">白い余白にも書き込めます。「文字」で画像をタップするとその場で入力(Enterで確定)。書いたものはタップで選択 → ドラッグで移動、青い丸で大きさ、緑の丸で回転。文字を打ち直すときは選んでから「文字を直す」。</p>' +
         '<div class="eactions">' +
           '<button class="btn" id="ecancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>' +
           '<button class="btn" id="edone" style="background:#3F7D4A">この内容で登録</button>' +
@@ -742,7 +743,6 @@ function annotateImage(src, existing) {
     let resizing = null;      // { ax, ay, d0 } while dragging a corner handle
     let rotating = null;      // { cx, cy, a0, r0 } while dragging the rotate grip
     let movedFar = false;     // distinguishes a tap from a drag
-    let tapCandidate = -1;    // text mark that a clean tap would reopen
     let downAt = null;
 
     function start(e) {
@@ -752,7 +752,6 @@ function annotateImage(src, existing) {
       const p = pos(e);
       downAt = p;
       movedFar = false;
-      tapCandidate = -1;
 
       // 1. grabbing a corner handle of the selected mark => resize
       const h = handleAt(p);   // "tl".."br", "rot", or null
@@ -778,11 +777,10 @@ function annotateImage(src, existing) {
       }
 
       // 2. touching an existing mark => select it and start moving.
-      // Whether this turns out to be a move or a tap-to-retype is decided in
-      // end(), once we know if the finger actually travelled.
+      // Retyping is done with the 文字を直す button, never by tapping, so a
+      // touch here is always a plain select-and-move.
       const hit = hitTest(p);
       if (hit >= 0) {
-        tapCandidate = (strokes[hit].type === "text" && sel === hit) ? hit : -1;
         sel = hit;
         dragFrom = p;
         redraw();
@@ -837,21 +835,10 @@ function annotateImage(src, existing) {
     }
 
     function end() {
-      const wasDragging = dragFrom != null;
       dragFrom = null;
       resizing = null;
       rotating = null;
       downAt = null;
-
-      // A tap that never moved, on text that was already selected, means
-      // "let me retype this" rather than "move it".
-      if (wasDragging && !movedFar && tapCandidate >= 0) {
-        const i = tapCandidate;
-        tapCandidate = -1;
-        openTextInput({ x:strokes[i].x1, y:strokes[i].y1 }, i);
-        return;
-      }
-      tapCandidate = -1;
 
       if (!active) return;
       const a = active;
@@ -887,6 +874,14 @@ function annotateImage(src, existing) {
       if (sel >= 0) { strokes[sel].size = size; redraw(); }
     });
     wrap.querySelector("#eundo").onclick = () => { strokes.pop(); sel = -1; redraw(); };
+    wrap.querySelector("#etext").onclick = () => {
+      if (sel < 0 || strokes[sel].type !== "text") {
+        alert("直したい文字をタップして選んでから押してください。");
+        return;
+      }
+      openTextInput({ x:strokes[sel].x1, y:strokes[sel].y1 }, sel);
+    };
+
     wrap.querySelector("#edel").onclick = () => {
       if (sel < 0) { alert("消したい書き込みをタップして選んでから押してください。"); return; }
       strokes.splice(sel, 1);
