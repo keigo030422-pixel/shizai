@@ -742,6 +742,7 @@ function annotateImage(src, existing) {
     let resizing = null;      // { ax, ay, d0 } while dragging a corner handle
     let rotating = null;      // { cx, cy, a0, r0 } while dragging the rotate grip
     let movedFar = false;     // distinguishes a tap from a drag
+    let tapCandidate = -1;    // text mark that a clean tap would reopen
     let downAt = null;
 
     function start(e) {
@@ -751,6 +752,7 @@ function annotateImage(src, existing) {
       const p = pos(e);
       downAt = p;
       movedFar = false;
+      tapCandidate = -1;
 
       // 1. grabbing a corner handle of the selected mark => resize
       const h = handleAt(p);   // "tl".."br", "rot", or null
@@ -775,14 +777,12 @@ function annotateImage(src, existing) {
         return;
       }
 
-      // 2. touching an existing mark => select it and start moving
+      // 2. touching an existing mark => select it and start moving.
+      // Whether this turns out to be a move or a tap-to-retype is decided in
+      // end(), once we know if the finger actually travelled.
       const hit = hitTest(p);
       if (hit >= 0) {
-        // tapping the already-selected text opens it for retyping
-        if (strokes[hit].type === "text" && sel === hit) {
-          openTextInput({ x:strokes[hit].x1, y:strokes[hit].y1 }, hit);
-          return;
-        }
+        tapCandidate = (strokes[hit].type === "text" && sel === hit) ? hit : -1;
         sel = hit;
         dragFrom = p;
         redraw();
@@ -803,7 +803,7 @@ function annotateImage(src, existing) {
       if (!resizing && !rotating && !dragFrom && !active) return;
       e.preventDefault();
       const p = pos(e);
-      if (downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > 5) movedFar = true;
+      if (downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > 6 * dscale()) movedFar = true;
 
       if (rotating) {
         const a = Math.atan2(p.y - rotating.cy, p.x - rotating.cx);
@@ -837,10 +837,22 @@ function annotateImage(src, existing) {
     }
 
     function end() {
+      const wasDragging = dragFrom != null;
       dragFrom = null;
       resizing = null;
       rotating = null;
       downAt = null;
+
+      // A tap that never moved, on text that was already selected, means
+      // "let me retype this" rather than "move it".
+      if (wasDragging && !movedFar && tapCandidate >= 0) {
+        const i = tapCandidate;
+        tapCandidate = -1;
+        openTextInput({ x:strokes[i].x1, y:strokes[i].y1 }, i);
+        return;
+      }
+      tapCandidate = -1;
+
       if (!active) return;
       const a = active;
       active = null;
@@ -849,17 +861,6 @@ function annotateImage(src, existing) {
       redraw();
     }
 
-    // Tapping a text mark again lets its wording be rewritten.
-    function dbl(e) {
-      if (!baseReady) return;
-      const p = pos(e);
-      const i = hitTest(p);
-      if (i < 0 || strokes[i].type !== "text") return;
-      e.preventDefault();
-      openTextInput({ x:strokes[i].x1, y:strokes[i].y1 }, i);
-    }
-
-    canvas.addEventListener("dblclick", dbl);
     canvas.addEventListener("mousedown", start);
     canvas.addEventListener("mousemove", move);
     window.addEventListener("mouseup", end);
