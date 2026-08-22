@@ -28,6 +28,19 @@
   .tick { font-size:16px; margin-right:8px; color:#3F7D4A; }
   .dragrow { touch-action:none; }
   .dragrow.dragging { background:#EFEDE4; opacity:.85; }
+  .lockscreen { position:fixed; inset:0; background:#F3F1EA; z-index:200;
+                display:flex; align-items:center; justify-content:center; padding:24px; }
+  .lockscreen.done { display:none; }
+  .lockbox { width:100%; max-width:340px; text-align:center; }
+  .lockbox h2 { margin:0 0 6px; font-size:19px; }
+  .lockbox p { margin:0 0 16px; font-size:13px; color:#8A8371; }
+  .lockbox input { width:100%; padding:12px 14px; border-radius:10px;
+                   border:1px solid #D8D2C0; font-size:16px; text-align:center; }
+  .lockbox button { width:100%; margin-top:12px; padding:13px; border-radius:10px;
+                    border:none; background:#3F7D4A; color:#fff; font-size:15px;
+                    font-weight:600; cursor:pointer; }
+  .lockerr { min-height:18px; margin:8px 0 0 !important; color:#B5552F !important;
+             font-size:12px !important; }
   .viewtabs { display:flex; gap:6px; margin-top:8px; }
   .vtab { flex:1; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:600;
           background:#fff; border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
@@ -228,6 +241,7 @@
       <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap">
         <button id="dobackup" class="minibtn">バックアップを保存</button>
         <button id="dorestore" class="minibtn">復元</button>
+        <button id="dopass" class="minibtn">パスワード変更</button>
         <button id="showbin" class="minibtn">保存先IDを表示</button>
       </div>
       <input id="restorefile" type="file" accept="application/json,.json" style="display:none" />
@@ -243,6 +257,16 @@
   <div class="main hidden" id="main"></div>
 </div>
 <div id="modalRoot"></div>
+<div id="lock" class="lockscreen">
+  <div class="lockbox">
+    <h2>品目別 資材ビューア</h2>
+    <p>パスワードを入力してください</p>
+    <input id="lockpass" type="password" inputmode="text" autocomplete="off"
+           autocapitalize="off" autocorrect="off" placeholder="パスワード" />
+    <p id="lockerr" class="lockerr"></p>
+    <button id="lockgo">開く</button>
+  </div>
+</div>
 <script>
 const SEED = [{"id":"m0","category":"南瓜","sale_type":"通常","item":"かぼちゃ","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":"南瓜は「南瓜ブロック」「南瓜スライス」に分けて整理。\n元データの「ブロック」「スライス」も南瓜として統一しています。"},{"id":"m1","category":"南瓜","sale_type":"通常","item":"かぼちゃ1/4","material_category":"ラップ","material_name":"i-PHM250_手巻きラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m2","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m3","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m4","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m5","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m6","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m7","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m8","category":"南瓜","sale_type":"レギュラー","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m9","category":"南瓜","sale_type":"予定数","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m10","category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜スライス","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m11","category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜ブロック","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m12","category":"人参","sale_type":"通常","item":"にんじん1本","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":""},{"id":"m13","category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*320*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m14","category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*400*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m15","category":"大根","sale_type":"通常","item":"大根","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m16","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*330_#20_袋_大根上部","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m17","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m18","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m19","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m20","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"トレー","material_name":"FLB-A10-25W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m21","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m22","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m23","category":"長芋","sale_type":"通常","item":"長芋","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m24","category":"長芋","sale_type":"通常","item":"長芋","material_category":"フィルム","material_name":"#25 0.02*350*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m25","category":"長芋","sale_type":"通常","item":"長芋","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m26","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m27","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"トレー","material_name":"FLB-V12-30W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m28","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラップ","material_name":"i-FA350_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m29","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m30","category":"キャベツ","sale_type":"通常","item":"きゃべつ1/2","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m31","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m32","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m33","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m34","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m35","category":"キャベツ","sale_type":"通常","item":"きゃべつ1/4","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m36","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m37","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m38","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m39","category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/2","material_category":"専用シール","material_name":"春キャベツ1/2シール","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m40","category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m41","category":"キャベツ","sale_type":"予定数","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m42","category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/4","material_category":"専用シール","material_name":"春キャベツ1/4シール","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m43","category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m44","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m45","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m46","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m47","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m48","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m49","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m50","category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"ラベル・シール","material_name":"15*25_産地小_無地ラベ","supplier":"高速","common_or_dedicated":"専用","memo":""},{"id":"m51","category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"専用シール","material_name":"ほうれん草専用","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m52","category":"ほうれん草","sale_type":"レギュラー","item":"ほうれん草","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m53","category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m54","category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m55","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"専用シール","material_name":"トマト小玉_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m56","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"ラップ","material_name":"i-FA300_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m57","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"その他","material_name":"APFC-V10-30M(V)ｴｺ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m58","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"専用シール","material_name":"ミニトマトカップ_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m59","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m60","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"その他","material_name":"CFR250","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m61","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m62","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"トレー","material_name":"CFR100","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m63","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_産地なし","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m64","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_熊本産","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m65","category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m66","category":"","sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"ミックスぶどう","supplier":"","common_or_dedicated":"","memo":""},{"id":"m67","category":"","sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"赤ぶどう","supplier":"","common_or_dedicated":"","memo":""},{"id":"m68","category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m69","category":"ぶどう","sale_type":"通常","item":"スイートサファイア","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m70","category":"ぶどう","sale_type":"通常","item":"スイートサファイア（黒）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m71","category":"ぶどう","sale_type":"通常","item":"種なしぶどう(3色MIX)大パック","material_category":"その他","material_name":"GPR-M ６Ｈ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m72","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（3色M）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m73","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ブラック）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m74","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ミックス）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m75","category":"さつまいも","sale_type":"通常","item":"さつまいも","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m76","category":"さつまいも","sale_type":"通常","item":"なると","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m77","category":"きゅうり","sale_type":"IDF","item":"きゅうり","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m78","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"トレー","material_name":"QX-R-V13-30_黒トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m79","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m80","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m81","category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"ラベル・シール","material_name":"アスパラ_ラベル","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m82","category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":""},{"id":"m83","category":"香味・つまもの","sale_type":"通常","item":"クレソン","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m84","category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m85","category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m86","category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m87","category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m88","category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m89","category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m90","category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m91","category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m92","category":"その他","sale_type":"IDF","item":"IDF","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m93","category":"その他","sale_type":"通常","item":"紅たて","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""}];
 const IMGBB_KEY = "c650c72c1e1d8d48196df9f894c44187";
@@ -303,6 +327,13 @@ let arrangeCat = null;  // item category currently being reordered
 let arrangeMatCat = null; // material category currently being reordered
 let listScroll = 0;     // remembered scroll position of the list pane
 let cameFromMat = null; // material we jumped from, to offer a way back
+
+// Simple shared passcode. It is stored with the data so it can be changed
+// from the app itself. This is a doorstop, not real security: anyone who can
+// read the page source or the stored data can find it.
+const DEFAULT_PASS = "kifa";
+let passcode = DEFAULT_PASS;
+let passRequired = true;   // whether the lock screen is shown at all
 
 function rememberScroll() {
   const el = document.getElementById("list");
@@ -393,6 +424,9 @@ async function loadAll() {
       itemPhotos = d.record.itemPhotos || {};
       migratePhotos();
       matPhotos = d.record.matPhotos || {};
+      passcode = d.record.passcode || DEFAULT_PASS;
+      // Default to on only when the setting has never been written.
+      passRequired = d.record.passRequired !== false;
     } else {
       rows = SEED.slice();
     }
@@ -402,6 +436,7 @@ async function loadAll() {
   }
   refreshItems();
   render();
+  initLock();
 }
 
 async function saveAll() {
@@ -409,7 +444,7 @@ async function saveAll() {
   const res = await fetch("https://api.jsonbin.io/v3/b/" + id, {
     method:"PUT",
     headers:{ "Content-Type":"application/json", "X-Master-Key":JSONBIN_KEY },
-    body: JSON.stringify({ rows, itemPhotos, matPhotos })
+    body: JSON.stringify({ rows, itemPhotos, matPhotos, passcode, passRequired })
   });
   if (!res.ok) {
     let msg = "保存に失敗";
@@ -2578,6 +2613,85 @@ document.getElementById("search").addEventListener("input", e => {
   if (view === "materials") renderMatList(); else renderList();
 });
 
+// The gate is only checked once the stored passcode has been fetched, so
+// loadAll() calls this when it finishes.
+let unlocked = false;
+
+function tryUnlock() {
+  const inp = document.getElementById("lockpass");
+  const err = document.getElementById("lockerr");
+  if ((inp.value || "").trim() === passcode) {
+    unlocked = true;
+    try { sessionStorage.setItem("pmv_ok", "1"); } catch (e) {}
+    document.getElementById("lock").classList.add("done");
+    err.textContent = "";
+    inp.value = "";
+  } else {
+    err.textContent = "パスワードが違います";
+    inp.value = "";
+    inp.focus();
+  }
+}
+
+function initLock() {
+  if (!passRequired) {          // gate switched off in settings
+    unlocked = true;
+    document.getElementById("lock").classList.add("done");
+    return;
+  }
+  // Staying unlocked for the tab means switching apps does not lock you out
+  // mid-shift, while a fresh visit still asks.
+  let remembered = false;
+  try { remembered = sessionStorage.getItem("pmv_ok") === "1"; } catch (e) {}
+  if (remembered) {
+    unlocked = true;
+    document.getElementById("lock").classList.add("done");
+    return;
+  }
+  document.getElementById("lockpass").focus();
+}
+
+document.getElementById("lockgo").addEventListener("click", tryUnlock);
+document.getElementById("lockpass").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); tryUnlock(); }
+});
+
+document.getElementById("dopass").addEventListener("click", () => {
+  openModal({
+    title: "パスワード設定",
+    message: passRequired
+      ? "開くときにパスワードを求めます。設定は全員に反映されます。"
+      : "現在パスワードなしで開けます。設定は全員に反映されます。",
+    fields: [
+      { key:"require", label:"開くときにパスワードを求める",
+        value: passRequired ? "する" : "しない", list:["する","しない"] },
+      { key:"now", label:"現在のパスワード（変更するときのみ）", value:"" },
+      { key:"next", label:"新しいパスワード（変えないときは空欄）", value:"" }
+    ],
+    onSubmit: async vals => {
+      const wantRequire = vals.require.trim() === "する";
+      const np = vals.next.trim();
+      const now = vals.now.trim();
+
+      // Any change to the gate itself has to be authorised with the current
+      // password, otherwise anyone already inside could quietly disable it.
+      const changingPass = np.length > 0;
+      const changingFlag = wantRequire !== passRequired;
+      if (!changingPass && !changingFlag) return;
+      if (now !== passcode) throw new Error("現在のパスワードを正しく入力してください");
+      if (changingPass && np.length < 3) throw new Error("新しいパスワードは3文字以上にしてください");
+
+      await withSave(async () => {
+        if (changingPass) passcode = np;
+        passRequired = wantRequire;
+      }, changingPass && changingFlag ? "設定を変更しました"
+         : changingPass ? "パスワードを変更しました"
+         : wantRequire ? "パスワードを求める設定にしました"
+                       : "パスワードなしで開けるようにしました");
+    }
+  });
+});
+
 // Everything lives in a single online bin, so an accidental delete is
 // otherwise unrecoverable. This writes the whole dataset out as a file the
 // user keeps, and can read one back in.
@@ -2639,6 +2753,8 @@ document.getElementById("restorefile").addEventListener("change", e => {
       itemPhotos = data.itemPhotos || {};
       matPhotos = data.matPhotos || {};
       migratePhotos();
+      // passcode / passRequired are deliberately left alone: restoring old
+      // data should not quietly reinstate an old password or unlock the app.
       selected = null;
       selectedMat = null;
     }, "バックアップから復元しました");
