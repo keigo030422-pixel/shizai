@@ -100,6 +100,7 @@
   .modal h3 { margin:0 0 14px; font-size:16px; }
   .field { margin-bottom:12px; }
   .field label { display:block; font-size:12px; font-weight:600; margin-bottom:5px; color:#5A5648; }
+  .field select { appearance:auto; }
   .field input, .field select, .field textarea {
     width:100%; padding:9px 11px; border-radius:8px; border:1px solid #D8D2C0;
     font-size:14px; background:#fff; font-family:inherit; }
@@ -1382,7 +1383,9 @@ function knownMaterials() {
         uses: 0
       });
     }
-    map.get(n).uses++;
+    // Holder rows (no item) keep an unused material alive in the master, so
+    // they must not count towards how many items use it.
+    if (r.item) map.get(n).uses++;
   }
   return [...map.values()].sort((a,b) => b.uses - a.uses || a.material_name.localeCompare(b.material_name, "ja"));
 }
@@ -1591,7 +1594,8 @@ function renderModal() {
       const thumb = ph
         ? '<img class="pthumb" src="' + esc(ph) + '" onerror="this.style.display=\'none\'" />'
         : '<div class="pthumb empty">写真<br>なし</div>';
-      html += '<button type="button" class="pitem" data-pick="' + esc(k.material_name) + '">' +
+      html += '<button type="button" class="pitem" data-pick="' + esc(k.material_name) +
+        '" data-cat="' + esc(k.material_category || "未分類") + '">' +
         thumb +
         '<span class="pbody"><span class="pname">' + esc(k.material_name) + '</span>' +
         '<span class="pmeta">' + esc(k.material_category || "区分なし") +
@@ -1599,6 +1603,8 @@ function renderModal() {
         " ・ " + k.uses + "品目で使用</span></span></button>";
     }
     html += "</div>";
+    html += '<p class="pickerempty" id="pickerempty" style="display:none;font-size:12px;color:#9A9382;' +
+            'padding:10px 4px;margin:0">この区分に登録済みの資材はまだありません。</p>';
     html += '<p style="font-size:11px;color:#9A9382;margin:6px 0 0">タップすると下の欄が自動入力されます。写真も引き継がれます。</p>';
     html += "</div>";
   }
@@ -1607,10 +1613,22 @@ function renderModal() {
     if (f.textarea) {
       html += '<textarea id="f_' + f.key + '">' + esc(f.value) + "</textarea>";
     } else if (f.list && f.list.length) {
-      html += '<input id="f_' + f.key + '" value="' + esc(f.value) + '" list="dl_' + f.key + '" />';
-      html += '<datalist id="dl_' + f.key + '">';
-      for (const o of f.list) html += "<option>" + esc(o) + "</option>";
-      html += "</datalist>";
+      // A real <select> rather than a datalist: input+datalist is unreliable on
+      // mobile browsers, where it often behaves like a plain text box. The last
+      // entry switches to a text field so a new value can still be typed.
+      const opts = [...new Set(f.list.filter(Boolean))];
+      const known = f.value && opts.includes(f.value);
+      html += '<select id="s_' + f.key + '" data-key="' + f.key + '">';
+      if (!f.value) html += '<option value="" selected>選択してください</option>';
+      for (const o of opts) {
+        html += '<option value="' + esc(o) + '"' + (known && o === f.value ? " selected" : "") + ">" +
+                esc(o) + "</option>";
+      }
+      const custom = f.value && !known;
+      html += '<option value="__new__"' + (custom ? " selected" : "") + ">＋ 新しく入力する</option>";
+      html += "</select>";
+      html += '<input id="f_' + f.key + '" value="' + esc(f.value) + '" placeholder="新しい名前を入力" ' +
+              'style="margin-top:6px;' + (custom ? "" : "display:none") + '" />';
     } else {
       html += '<input id="f_' + f.key + '" value="' + esc(f.value) + '" />';
     }
@@ -1631,25 +1649,86 @@ function renderModal() {
   const extra = document.getElementById("mextra");
   if (extra) extra.onclick = () => modal.extraButton.onClick();
 
+  // Set both halves of a field: the dropdown if the value is one of the
+  // existing options, otherwise the free-text box.
+  function setField(key, v) {
+    const sel = document.getElementById("s_" + key);
+    const txt = document.getElementById("f_" + key);
+    if (txt) txt.value = v || "";
+    if (!sel) return;
+    const has = [...sel.options].some(o => o.value === v);
+    if (has) {
+      sel.value = v;
+      if (txt) txt.style.display = "none";
+    } else if (v) {
+      sel.value = "__new__";
+      if (txt) txt.style.display = "";
+    }
+  }
+
   root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
     const k = (modal.picker || []).find(x => x.material_name === b.dataset.pick);
     if (!k) return;
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-    set("f_material_name", k.material_name);
-    set("f_material_category", k.material_category);
-    set("f_supplier", k.supplier);
-    set("f_common_or_dedicated", k.common_or_dedicated || "共通");
+    setField("material_name", k.material_name);
+    setField("material_category", k.material_category);
+    setField("supplier", k.supplier);
+    setField("common_or_dedicated", k.common_or_dedicated || "共通");
     root.querySelectorAll("[data-pick]").forEach(x => x.classList.remove("sel"));
     b.classList.add("sel");
   });
+
+  // Narrow the "pick an existing material" list to the chosen 資材区分, so a
+  // long list becomes just the handful that belong in that group.
+  function filterPicker() {
+    const box = document.getElementById("picker");
+    if (!box) return;
+    const selCat = document.getElementById("s_material_category");
+    const txtCat = document.getElementById("f_material_category");
+    let cat = "";
+    if (selCat && selCat.value && selCat.value !== "__new__") cat = selCat.value;
+    else if (txtCat) cat = txtCat.value.trim();
+
+    let shown = 0;
+    box.querySelectorAll("[data-pick]").forEach(b => {
+      const ok = !cat || b.dataset.cat === cat;
+      b.style.display = ok ? "" : "none";
+      if (ok) shown++;
+    });
+    const empty = document.getElementById("pickerempty");
+    box.style.display = shown ? "" : "none";
+    if (empty) empty.style.display = shown ? "none" : "block";
+  }
+
+  root.querySelectorAll("select[data-key]").forEach(sel => {
+    const key = sel.dataset.key;
+    const txt = document.getElementById("f_" + key);
+    sel.onchange = () => {
+      if (txt) {
+        if (sel.value === "__new__") {
+          txt.style.display = "";
+          txt.value = "";
+          txt.focus();
+        } else {
+          txt.style.display = "none";
+          txt.value = sel.value;
+        }
+      }
+      if (key === "material_category") filterPicker();
+    };
+  });
+  const catTxt = document.getElementById("f_material_category");
+  if (catTxt) catTxt.addEventListener("input", filterPicker);
+  filterPicker();
 
   document.getElementById("mcancel").onclick = closeModal;
   document.getElementById("mbg").onclick = e => { if (e.target.id === "mbg") closeModal(); };
   document.getElementById("mok").onclick = async () => {
     const vals = {};
     for (const f of (modal.fields || [])) {
+      const sel = document.getElementById("s_" + f.key);
       const el = document.getElementById("f_" + f.key);
-      vals[f.key] = el ? el.value : "";
+      if (sel && sel.value !== "__new__") vals[f.key] = sel.value;
+      else vals[f.key] = el ? el.value : "";
     }
     const fn = modal.onSubmit;
     closeModal();
@@ -2095,7 +2174,7 @@ function renderDetail() {
           (p ? '<button class="minibtn" data-mw="' + esc(m.material_name) + '">書き込む</button>' : "") +
           (p ? '<button class="minibtn" data-mx="' + esc(m.material_name) + '">写真削除</button>' : "") +
           '<button class="minibtn" data-me="' + m.id + '">編集</button>' +
-          '<button class="minibtn" data-md="' + m.id + '" style="color:#B5552F">削除</button>' +
+          '<button class="minibtn" data-md="' + m.id + '" style="color:#B5552F">この品目から外す</button>' +
         "</div></div></div>";
     }
     matHtml += '<div class="matgroup"><div class="gh" style="background:' + c + '1F;color:' + c + '">' +
@@ -2184,10 +2263,28 @@ function renderDetail() {
       to ? "非表示にしました" : "再表示しました");
   };
   document.getElementById("delitem").onclick = () => confirmModal(
-    "品目を削除", "「" + cur.item + "」と、その資材" + cur.materials.length + "件をすべて削除します。よろしいですか?",
+    "品目を削除",
+    "「" + cur.item + "」を削除します。使っていた資材 " + cur.materials.length + " 件は資材マスタに残ります。",
     async () => {
       await withSave(async () => {
+        const wasUsing = cur.materials.map(m => ({
+          material_name: m.material_name,
+          material_category: m.material_category,
+          supplier: m.supplier,
+          common_or_dedicated: m.common_or_dedicated
+        }));
         rows = rows.filter(r => r.item !== cur.item);
+        // Preserve any material this was the last user of.
+        for (const w of wasUsing) {
+          if (!w.material_name || w.material_name === "(資材を追加してください)") continue;
+          if (rows.some(x => x.material_name === w.material_name)) continue;
+          rows.push({
+            id: newId(), item: "", category: "", sale_type: "",
+            material_category: w.material_category || "未分類",
+            material_name: w.material_name, supplier: w.supplier || "",
+            common_or_dedicated: w.common_or_dedicated || "", memo: ""
+          });
+        }
         delete itemPhotos[cur.item];
         selected = null;
       }, "品目を削除しました");
@@ -2204,11 +2301,25 @@ function renderDetail() {
   el.querySelectorAll("[data-md]").forEach(b => b.onclick = () => {
     const r = rows.find(x => x.id === b.dataset.md);
     if (!r) return;
-    confirmModal("資材を削除", "「" + r.material_name + "」を削除します。よろしいですか?", async () => {
-      await withSave(async () => {
-        rows = rows.filter(x => x.id !== r.id);
-      }, "資材を削除しました");
-    });
+    confirmModal("この品目から外す",
+      "「" + r.material_name + "」をこの品目から外します。資材そのものは資材マスタに残ります。",
+      async () => {
+        await withSave(async () => {
+          const name = r.material_name;
+          rows = rows.filter(x => x.id !== r.id);
+          // If that was the last item using it, keep the material alive as a
+          // holder row so it stays in the master and in the picker.
+          const stillUsed = rows.some(x => x.material_name === name);
+          if (!stillUsed && name && name !== "(資材を追加してください)") {
+            rows.push({
+              id: newId(), item: "", category: "", sale_type: "",
+              material_category: r.material_category || "未分類",
+              material_name: name, supplier: r.supplier || "",
+              common_or_dedicated: r.common_or_dedicated || "", memo: ""
+            });
+          }
+        }, "この品目から外しました");
+      });
   });
 }
 
