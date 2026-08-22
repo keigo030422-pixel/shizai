@@ -114,7 +114,8 @@
   .ebtn { padding:6px 12px; border-radius:7px; font-size:12px; background:#fff;
           border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
   .ecanvas-wrap { display:flex; justify-content:center; background:#2B2A24;
-                  border-radius:10px; padding:8px; margin-bottom:10px; }
+                  border-radius:10px; padding:8px; margin-bottom:6px; }
+  .ehint { font-size:11px; color:#8A8371; margin:0 0 10px; }
   #ecanvas { max-width:100%; touch-action:none; border-radius:6px; cursor:crosshair; }
   .eactions { display:flex; gap:8px; }
   .eactions .btn { flex:1; }
@@ -378,11 +379,9 @@ function annotateImage(src, existing) {
     wrap.innerHTML =
       '<div class="editor">' +
         '<div class="etoolbar">' +
-          '<button class="etool active" data-tool="draw">手書き</button>' +
-          '<button class="etool" data-tool="arrow">矢印</button>' +
+          '<button class="etool active" data-tool="arrow">矢印</button>' +
           '<button class="etool" data-tool="rect">囲み</button>' +
           '<button class="etool" data-tool="text">文字</button>' +
-          '<button class="etool" data-tool="pick">選択</button>' +
         '</div>' +
         '<div class="etoolbar">' +
           '<span class="ecolors">' +
@@ -403,6 +402,7 @@ function annotateImage(src, existing) {
           '<button class="ebtn" id="eclear" style="color:#B5552F">全消し</button>' +
         '</div>' +
         '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
+        '<p class="ehint">白い余白にも書き込めます。書いたものをタップすると選択され、そのままドラッグで移動、四隅の丸をドラッグで大きさ変更。文字はダブルタップで書き直せます。</p>' +
         '<div class="eactions">' +
           '<button class="btn" id="ecancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>' +
           '<button class="btn" id="edone" style="background:#3F7D4A">この内容で登録</button>' +
@@ -415,25 +415,58 @@ function annotateImage(src, existing) {
     const img = new Image();
     img.crossOrigin = "anonymous";
 
-    let tool = "draw", stroke = "#E03131", size = 6;
-    let strokes = (existing || []).map(s => JSON.parse(JSON.stringify(s)));
+    let tool = "arrow", stroke = "#E03131", size = 6;
+    let strokes = [];  // filled in once the image size is known (see img.onload)
+
+    // Marks are saved relative to the photo (0..1 across its width/height, and
+    // values outside that range sit in the margin), so they land in the right
+    // spot no matter what size the canvas is next time it opens.
+    function denorm(s) {
+      const o = JSON.parse(JSON.stringify(s));
+      const X = v => PAD + v * imgW, Y = v => PAD + v * imgH;
+      o.x1 = X(o.x1); o.y1 = Y(o.y1);
+      if (o.x2 != null) { o.x2 = X(o.x2); o.y2 = Y(o.y2); }
+      o.size = o.size * imgW;
+      return o;
+    }
+    function norm(s) {
+      const o = JSON.parse(JSON.stringify(s));
+      const X = v => (v - PAD) / imgW, Y = v => (v - PAD) / imgH;
+      o.x1 = X(o.x1); o.y1 = Y(o.y1);
+      if (o.x2 != null) { o.x2 = X(o.x2); o.y2 = Y(o.y2); }
+      o.size = o.size / imgW;
+      return o;
+    }
     let active = null;         // in-progress shape
     let sel = -1;              // index of the selected mark
     let baseReady = false;
 
+    // The canvas is larger than the photo: PAD is blank margin on every side
+    // so notes and arrows can be placed outside the picture itself.
+    let PAD = 0, imgW = 0, imgH = 0;
+
     function fit() {
       const maxW = Math.min(window.innerWidth - 32, 760);
-      const maxH = window.innerHeight * 0.56;
+      const maxH = window.innerHeight * 0.52;
       let w = img.width, h = img.height;
       const r = Math.min(maxW / w, maxH / h, 1);
-      canvas.width = Math.round(w * r);
-      canvas.height = Math.round(h * r);
+      imgW = Math.round(w * r);
+      imgH = Math.round(h * r);
+      PAD = Math.round(Math.max(56, Math.min(imgW, imgH) * 0.22));
+      canvas.width = imgW + PAD * 2;
+      canvas.height = imgH + PAD * 2;
     }
 
     function redraw() {
       if (!baseReady) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, PAD, PAD, imgW, imgH);
+      ctx.save();
+      ctx.strokeStyle = "#D8D2C0";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD + 0.5, PAD + 0.5, imgW - 1, imgH - 1);
+      ctx.restore();
       const all = active ? strokes.concat([active]) : strokes;
       all.forEach((s, i) => {
         drawShape(s);
@@ -443,10 +476,6 @@ function annotateImage(src, existing) {
 
     // Bounding box of a mark, used for selection and the highlight ring.
     function bbox(s) {
-      if (s.type === "draw") {
-        const xs = s.pts.map(p => p.x), ys = s.pts.map(p => p.y);
-        return { x1:Math.min(...xs), y1:Math.min(...ys), x2:Math.max(...xs), y2:Math.max(...ys) };
-      }
       if (s.type === "text") {
         const fs = Math.max(16, s.size * 4);
         const lines = String(s.text).split("\n");
@@ -459,22 +488,70 @@ function annotateImage(src, existing) {
       };
     }
 
+    const HPAD = 8;      // gap between a mark and its selection ring
+    const HR = 11;       // radius of the corner grab handles
+
+    // Corner positions of the selection ring, used both for drawing the
+    // handles and for working out whether a touch grabbed one.
+    function handles(s) {
+      const b = bbox(s);
+      return [
+        { id:"tl", x:b.x1 - HPAD, y:b.y1 - HPAD },
+        { id:"tr", x:b.x2 + HPAD, y:b.y1 - HPAD },
+        { id:"bl", x:b.x1 - HPAD, y:b.y2 + HPAD },
+        { id:"br", x:b.x2 + HPAD, y:b.y2 + HPAD }
+      ];
+    }
+
     function outline(s) {
-      const b = bbox(s), pad = 8;
+      const b = bbox(s);
       ctx.save();
       ctx.strokeStyle = "#1971C2";
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
-      ctx.strokeRect(b.x1 - pad, b.y1 - pad, (b.x2 - b.x1) + pad*2, (b.y2 - b.y1) + pad*2);
+      ctx.strokeRect(b.x1 - HPAD, b.y1 - HPAD, (b.x2 - b.x1) + HPAD*2, (b.y2 - b.y1) + HPAD*2);
+      ctx.setLineDash([]);
+      for (const h of handles(s)) {
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, HR, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fill();
+        ctx.strokeStyle = "#1971C2";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
     function hitTest(p) {
       for (let i = strokes.length - 1; i >= 0; i--) {
-        const b = bbox(strokes[i]), pad = 10;
+        const b = bbox(strokes[i]), pad = 12;
         if (p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad) return i;
       }
       return -1;
+    }
+
+    function handleAt(p) {
+      if (sel < 0) return null;
+      for (const h of handles(strokes[sel])) {
+        const d = Math.hypot(p.x - h.x, p.y - h.y);
+        if (d <= HR + 10) return h.id;
+      }
+      return null;
+    }
+
+    // Resize a mark around the corner opposite the one being dragged.
+    function scaleShape(s, f, ax, ay) {
+      const sc = (x, y) => ({ x: ax + (x - ax) * f, y: ay + (y - ay) * f });
+      if (s.type === "text") {
+        const a = sc(s.x1, s.y1);
+        s.x1 = a.x; s.y1 = a.y;
+        s.size = Math.max(2, s.size * f);
+      } else {
+        const a = sc(s.x1, s.y1), b2 = sc(s.x2, s.y2);
+        s.x1 = a.x; s.y1 = a.y; s.x2 = b2.x; s.y2 = b2.y;
+        s.size = Math.max(1, s.size * Math.sqrt(f));
+      }
     }
 
     function drawShape(s) {
@@ -484,11 +561,7 @@ function annotateImage(src, existing) {
       ctx.lineWidth = s.size;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      if (s.type === "draw") {
-        ctx.beginPath();
-        s.pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
-        ctx.stroke();
-      } else if (s.type === "rect") {
+      if (s.type === "rect") {
         ctx.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
       } else if (s.type === "arrow") {
         const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
@@ -529,63 +602,105 @@ function annotateImage(src, existing) {
       };
     }
 
-    let dragFrom = null;
+    let dragFrom = null;      // last pointer position while moving a mark
+    let resizing = null;      // { id, ax, ay, d0 } while dragging a corner handle
+    let movedFar = false;     // distinguishes a tap from a drag
+    let downAt = null;
 
     function start(e) {
       if (!baseReady) return;
       e.preventDefault();
       const p = pos(e);
-      if (tool === "pick") {
-        sel = hitTest(p);
-        dragFrom = sel >= 0 ? p : null;
-        redraw();
+      downAt = p;
+      movedFar = false;
+
+      // 1. grabbing a corner handle of the selected mark => resize
+      const h = handleAt(p);
+      if (h) {
+        const b = bbox(strokes[sel]);
+        const ax = h.id.includes("l") ? b.x2 : b.x1;   // anchor = opposite corner
+        const ay = h.id.includes("t") ? b.y2 : b.y1;
+        resizing = { ax:ax, ay:ay, d0: Math.max(8, Math.hypot(p.x - ax, p.y - ay)) };
         return;
       }
-      if (tool === "text") {
-        const txt = prompt("画像に入れる文字を入力してください");
-        if (txt && txt.trim()) {
-          strokes.push({ type:"text", text:txt.trim(), x1:p.x, y1:p.y, color:stroke, size:size });
-          redraw();
-        }
-        return;
-      }
-      active = (tool === "draw")
-        ? { type:"draw", pts:[p], color:stroke, size:size }
-        : { type:tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:stroke, size:size };
-      redraw();
-    }
-    function move(e) {
-      if (tool === "pick") {
-        if (dragFrom == null || sel < 0) return;
-        e.preventDefault();
-        const p = pos(e);
-        const dx = p.x - dragFrom.x, dy = p.y - dragFrom.y;
-        const s = strokes[sel];
-        if (s.type === "draw") s.pts = s.pts.map(q => ({ x:q.x + dx, y:q.y + dy }));
-        else { s.x1 += dx; s.y1 += dy; if (s.x2 != null) { s.x2 += dx; s.y2 += dy; } }
+
+      // 2. touching an existing mark => select it and start moving
+      const hit = hitTest(p);
+      if (hit >= 0) {
+        sel = hit;
         dragFrom = p;
         redraw();
         return;
       }
-      if (!active) return;
-      e.preventDefault();
-      const p = pos(e);
-      if (active.type === "draw") active.pts.push(p);
-      else { active.x2 = p.x; active.y2 = p.y; }
-      redraw();
-    }
-    function end() {
-      dragFrom = null;
-      if (!active) return;
-      const a = active;
-      active = null;
-      const tiny = a.type !== "draw" &&
-        Math.abs(a.x2 - a.x1) < 4 && Math.abs(a.y2 - a.y1) < 4;
-      if (!tiny) strokes.push(a);
+
+      // 3. empty space => deselect and start a new mark
       sel = -1;
+      if (tool === "text") {
+        const txt = prompt("画像に入れる文字を入力してください");
+        if (txt && txt.trim()) {
+          strokes.push({ type:"text", text:txt.trim(), x1:p.x, y1:p.y, color:stroke, size:size });
+          sel = strokes.length - 1;
+        }
+        redraw();
+        return;
+      }
+      active = { type:tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:stroke, size:size };
       redraw();
     }
 
+    function move(e) {
+      if (!resizing && !dragFrom && !active) return;
+      e.preventDefault();
+      const p = pos(e);
+      if (downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > 5) movedFar = true;
+
+      if (resizing) {
+        const d = Math.max(8, Math.hypot(p.x - resizing.ax, p.y - resizing.ay));
+        const f = d / resizing.d0;
+        if (f > 0.05 && f < 20) {
+          scaleShape(strokes[sel], f, resizing.ax, resizing.ay);
+          resizing.d0 = d;
+          redraw();
+        }
+        return;
+      }
+      if (dragFrom) {
+        const dx = p.x - dragFrom.x, dy = p.y - dragFrom.y;
+        const s = strokes[sel];
+        s.x1 += dx; s.y1 += dy;
+        if (s.x2 != null) { s.x2 += dx; s.y2 += dy; }
+        dragFrom = p;
+        redraw();
+        return;
+      }
+      active.x2 = p.x; active.y2 = p.y;
+      redraw();
+    }
+
+    function end() {
+      dragFrom = null;
+      resizing = null;
+      downAt = null;
+      if (!active) return;
+      const a = active;
+      active = null;
+      const tiny = Math.abs(a.x2 - a.x1) < 5 && Math.abs(a.y2 - a.y1) < 5;
+      if (!tiny) { strokes.push(a); sel = strokes.length - 1; }
+      redraw();
+    }
+
+    // Tapping a text mark again lets its wording be rewritten.
+    function dbl(e) {
+      if (!baseReady) return;
+      const p = pos(e);
+      const i = hitTest(p);
+      if (i < 0 || strokes[i].type !== "text") return;
+      e.preventDefault();
+      const txt = prompt("文字を書き直してください", strokes[i].text);
+      if (txt != null && txt.trim()) { strokes[i].text = txt.trim(); sel = i; redraw(); }
+    }
+
+    canvas.addEventListener("dblclick", dbl);
     canvas.addEventListener("mousedown", start);
     canvas.addEventListener("mousemove", move);
     window.addEventListener("mouseup", end);
@@ -595,8 +710,6 @@ function annotateImage(src, existing) {
 
     wrap.querySelectorAll(".etool").forEach(b => b.onclick = () => {
       tool = b.dataset.tool;
-      if (tool !== "pick") sel = -1;
-      canvas.style.cursor = tool === "pick" ? "pointer" : "crosshair";
       redraw();
       wrap.querySelectorAll(".etool").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
@@ -615,7 +728,7 @@ function annotateImage(src, existing) {
     });
     wrap.querySelector("#eundo").onclick = () => { strokes.pop(); sel = -1; redraw(); };
     wrap.querySelector("#edel").onclick = () => {
-      if (sel < 0) { alert("「選択」で消したい書き込みをタップしてから押してください。"); return; }
+      if (sel < 0) { alert("消したい書き込みをタップして選んでから押してください。"); return; }
       strokes.splice(sel, 1);
       sel = -1;
       redraw();
@@ -633,11 +746,16 @@ function annotateImage(src, existing) {
     wrap.querySelector("#edone").onclick = () => {
       sel = -1;
       redraw();
-      const marks = JSON.parse(JSON.stringify(strokes));
+      const marks = strokes.map(norm);
       canvas.toBlob(b => { cleanup(); resolve({ blob: b, marks: marks }); }, "image/jpeg", 0.88);
     };
 
-    img.onload = () => { baseReady = true; fit(); redraw(); };
+    img.onload = () => {
+      baseReady = true;
+      fit();
+      strokes = (existing || []).map(denorm);
+      redraw();
+    };
     img.onerror = () => { cleanup(); resolve(null); };
     img.src = src;
   });
