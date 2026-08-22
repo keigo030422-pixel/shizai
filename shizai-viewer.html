@@ -159,6 +159,9 @@
       <h1>品目別 資材ビューア</h1>
       <p>商品を選ぶと使用資材が一覧表示されます</p>
       <p style="margin-top:3px">※ 登録内容は全員に共有されます</p>
+      <button id="showbin" class="minibtn" style="margin-top:6px">保存先IDを表示</button>
+      <p id="binout" style="margin-top:5px; font-family:monospace; font-size:11px;
+         word-break:break-all; color:#3F7D4A"></p>
     </div>
     <div class="search-wrap">
       <input id="search" type="text" placeholder="品目名で検索..." />
@@ -1430,6 +1433,12 @@ function renderDetail() {
 function render() { renderCats(); renderList(); renderDetail(); renderModal(); }
 
 document.getElementById("search").addEventListener("input", e => { query = e.target.value; renderList(); });
+
+document.getElementById("showbin").addEventListener("click", () => {
+  const id = BIN_ID || localBin();
+  const out = document.getElementById("binout");
+  out.textContent = id ? id : "まだ保存先がありません(写真を1枚登録すると作られます)";
+});
 
 rows = SEED.slice();
 refreshItems();
