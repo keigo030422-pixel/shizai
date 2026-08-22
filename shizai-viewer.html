@@ -1219,6 +1219,53 @@ function deleteCategoryModal(cat, count) {
   });
 }
 
+// Copies a品目 along with every material row attached to it. Material photos
+// are keyed by material name and so are shared automatically; the item's own
+// photos are copied across only if asked, since they show the actual product.
+function duplicateItemModal(srcItem) {
+  const src = itemMap.get(srcItem);
+  if (!src) return;
+  const srcPhotos = photosOf(srcItem);
+  openModal({
+    title: "品目を複製",
+    message: "「" + srcItem + "」の資材 " + src.materials.length + " 件をそのままコピーします。",
+    fields: [
+      { key:"item", label:"新しい品目名", value: srcItem + " のコピー", required:true },
+      { key:"category", label:"商品分類", value: src.category || "", list: allCats() },
+      { key:"copyPhotos", label:"商品写真もコピーする(" + srcPhotos.length + "枚)",
+        value: srcPhotos.length ? "はい" : "いいえ", list:["はい","いいえ"] }
+    ],
+    onSubmit: async vals => {
+      const name = vals.item.trim();
+      if (!name) throw new Error("品目名を入力してください");
+      if (itemMap.has(name)) throw new Error("その品目名はすでにあります");
+      await withSave(async () => {
+        for (const m of src.materials) {
+          rows.push({
+            id: newId(),
+            item: name,
+            category: vals.category.trim(),
+            sale_type: m.sale_type || "",
+            material_category: m.material_category || "未分類",
+            material_name: m.material_name || "",
+            supplier: m.supplier || "",
+            common_or_dedicated: m.common_or_dedicated || "",
+            memo: m.memo || ""
+          });
+        }
+        if (vals.copyPhotos.trim() === "はい" && srcPhotos.length) {
+          setPhotosOf(name, srcPhotos.map(p => {
+            const e = asPhoto(p);
+            return { base:e.base, display:e.display, marks:e.marks, note:e.note };
+          }));
+        }
+        selected = name;
+        activeCat = "全て";
+      }, "品目を複製しました");
+    }
+  });
+}
+
 function itemFormModal(existingItem) {
   const cur = existingItem ? itemMap.get(existingItem) : null;
   const first = cur ? cur.materials[0] : null;
@@ -1605,6 +1652,7 @@ function renderDetail() {
       '<div class="addbar">' +
         '<button class="minibtn" id="addmat" style="border-color:' + c + ';color:' + c + '">＋ 資材を追加</button>' +
         '<button class="minibtn" id="edititem">品目を編集</button>' +
+        '<button class="minibtn" id="dupitem">この品目を複製</button>' +
         '<button class="minibtn" id="delitem" style="color:#B5552F">品目を削除</button>' +
       "</div>" +
       matHtml +
@@ -1631,6 +1679,7 @@ function renderDetail() {
 
   document.getElementById("addmat").onclick = () => materialFormModal(null);
   document.getElementById("edititem").onclick = () => itemFormModal(cur.item);
+  document.getElementById("dupitem").onclick = () => duplicateItemModal(cur.item);
   document.getElementById("delitem").onclick = () => confirmModal(
     "品目を削除", "「" + cur.item + "」と、その資材" + cur.materials.length + "件をすべて削除します。よろしいですか?",
     async () => {
