@@ -1096,19 +1096,24 @@ function openLightbox(list, start) {
   // A photo rarely matches the phone's aspect ratio, so showing all of it
   // always leaves black bars. This toggle lets the picture fill the screen
   // instead, trading the edges for size.
-  let filled = false;
+  let filled = true;   // open filled; the toggle backs off to whole-photo view
   fitEl.onclick = e => {
     e.stopPropagation();
     filled = !filled;
+    applyFit();
+  };
+
+  function applyFit() {
     imgEl.style.objectFit = filled ? "cover" : "contain";
     imgEl.style.width = filled ? "100%" : "auto";
     imgEl.style.height = filled ? "100%" : "auto";
     fitEl.textContent = filled ? "全体を表示" : "画面いっぱい";
-  };
+  }
 
   function show() {
     const p = asPhoto(photos[i]);
     imgEl.src = p.display;
+    applyFit();
     noteEl.textContent = p.note || "";
     noteEl.style.display = p.note ? "block" : "none";
     countEl.textContent = photos.length > 1 ? (i + 1) + " / " + photos.length : "";
