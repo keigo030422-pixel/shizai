@@ -6,102 +6,142 @@
 <title>品目別 資材ビューア</title>
 <style>
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
-    background: #F3F1EA;
-    color: #2B2A24;
-    -webkit-text-size-adjust: 100%;
-  }
-  #app { display: flex; flex-direction: column; min-height: 100vh; }
-  .header {
-    background: #EAE6D9;
-    border-bottom: 1px solid #D8D2C0;
-    padding: 14px 16px;
-  }
-  .header h1 { margin: 0 0 2px; font-size: 17px; }
-  .header p { margin: 0; font-size: 11px; color: #8A8371; }
-  .search-wrap { padding: 10px 12px; background: #EAE6D9; border-bottom: 1px solid #D8D2C0; }
-  .search-wrap input {
-    width: 100%; padding: 9px 12px; border-radius: 8px;
-    border: 1px solid #D8D2C0; font-size: 14px;
-  }
-  .cats { padding: 8px 12px; background: #EAE6D9; border-bottom: 1px solid #D8D2C0;
-          display: flex; flex-wrap: wrap; gap: 6px; }
-  .cat-btn {
-    padding: 5px 11px; border-radius: 999px; font-size: 12px;
-    border: 1px solid #D8D2C0; background: #fff; color: #5A5648; cursor: pointer;
-  }
-  .cat-btn.active { color: #fff; border-color: transparent; }
-  .list { flex: 1; overflow-y: auto; background: #EAE6D9; }
-  .cat-head {
-    padding: 6px 16px; font-size: 11px; font-weight: bold;
-    display: flex; align-items: center; gap: 6px; background: #EAE6D9;
-    position: sticky; top: 0;
-  }
-  .dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
-  .item-btn {
-    width: 100%; text-align: left; padding: 11px 16px; font-size: 14px;
-    background: none; border: none; border-left: 3px solid transparent;
-    display: flex; justify-content: space-between; align-items: center;
-    color: #5A5648; cursor: pointer;
-  }
-  .item-btn .thumb { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; margin-right: 8px; }
-  .item-btn .left { display: flex; align-items: center; }
-  .item-btn .count { font-size: 11px; opacity: .5; }
-  .detail { padding: 16px; max-width: 820px; margin: 0 auto; width: 100%; }
-  .back-btn {
-    background: none; border: none; font-size: 14px; font-weight: 600;
-    padding: 4px 0 12px; cursor: pointer;
-  }
-  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-  .badge { font-size: 11px; padding: 4px 10px; border-radius: 999px; }
-  .badge.plain { background: #fff; border: 1px solid #D8D2C0; color: #5A5648; }
-  .imgbox {
-    width: 100%; max-width: 260px; aspect-ratio: 1;
-    background: #fff; border: 1px solid #D8D2C0; border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden; margin-bottom: 10px;
-  }
-  .imgbox img { width: 100%; height: 100%; object-fit: cover; }
-  .placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .placeholder .circle {
-    width: 60px; height: 60px; border-radius: 999px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; font-weight: bold;
-  }
-  .placeholder span { font-size: 11px; color: #9A9382; }
-  .btn {
-    display: block; width: 100%; max-width: 260px; padding: 11px;
-    border-radius: 8px; border: none; font-size: 14px; font-weight: 600;
-    color: #fff; cursor: pointer; margin-bottom: 8px; text-align: center;
-  }
-  .btn.ghost { background: #fff; border: 1px solid #D8D2C0; color: #9A5A4A; }
-  h2.title { font-size: 24px; margin: 12px 0 4px; }
-  p.meta { font-size: 13px; color: #8A8371; margin: 0 0 12px; }
-  .memo {
-    font-size: 12px; padding: 10px 12px; border-radius: 8px; white-space: pre-line;
-    background: #FBF6E3; border: 1px solid #EAD9A0; color: #7A6420; margin-bottom: 16px;
-  }
-  .matgroup { background: #fff; border: 1px solid #E3DFD1; border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
-  .matgroup .gh { padding: 9px 14px; font-size: 13px; font-weight: bold; }
-  .matrow { padding: 11px 14px; border-top: 1px solid #F0EDE2; }
-  .matgroup .matrow:first-of-type { border-top: none; }
-  .matname { font-size: 14px; font-weight: 500; }
-  .tag { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
-  .supplier { font-size: 12px; color: #9A9382; margin-top: 3px; }
-  .status { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; max-width: 260px; }
-  .status.err { background: #FDECE4; color: #B5552F; }
-  .status.ok { background: #E7F1E4; color: #3F7D4A; }
-  .hidden { display: none !important; }
-  @media (min-width: 768px) {
-    #app { flex-direction: row; height: 100vh; }
-    .sidebar { width: 320px; flex-shrink: 0; border-right: 1px solid #D8D2C0;
-               display: flex; flex-direction: column; }
-    .main { flex: 1; overflow-y: auto; }
-    .back-btn { display: none; }
-    .sidebar, .main { display: flex !important; }
-    .detail { padding: 28px; }
+  body { margin:0; font-family:'Hiragino Sans','Yu Gothic',system-ui,sans-serif;
+         background:#F3F1EA; color:#2B2A24; -webkit-text-size-adjust:100%; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+  .header { background:#EAE6D9; border-bottom:1px solid #D8D2C0; padding:14px 16px; }
+  .header h1 { margin:0 0 2px; font-size:17px; }
+  .header p { margin:0; font-size:11px; color:#8A8371; }
+  .search-wrap { padding:10px 12px; background:#EAE6D9; border-bottom:1px solid #D8D2C0; }
+  .search-wrap input { width:100%; padding:9px 12px; border-radius:8px;
+                       border:1px solid #D8D2C0; font-size:14px; }
+  .cats { padding:8px 12px; background:#EAE6D9; border-bottom:1px solid #D8D2C0;
+          display:flex; flex-wrap:wrap; gap:6px; }
+  .cat-btn { padding:5px 11px; border-radius:999px; font-size:12px;
+             border:1px solid #D8D2C0; background:#fff; color:#5A5648; cursor:pointer; }
+  .cat-btn.active { color:#fff; border-color:transparent; }
+  .list { flex:1; overflow-y:auto; background:#EAE6D9; }
+  .cat-head { padding:6px 16px; font-size:11px; font-weight:bold; display:flex;
+              align-items:center; gap:6px; background:#EAE6D9; position:sticky; top:0; }
+  .dot { width:7px; height:7px; border-radius:999px; display:inline-block; }
+  .item-btn { width:100%; text-align:left; padding:11px 16px; font-size:14px;
+              background:none; border:none; border-left:3px solid transparent;
+              display:flex; justify-content:space-between; align-items:center;
+              color:#5A5648; cursor:pointer; }
+  .item-btn .thumb { width:22px; height:22px; border-radius:4px; object-fit:cover; margin-right:8px; }
+  .item-btn .left { display:flex; align-items:center; }
+  .item-btn .count { font-size:11px; opacity:.5; }
+  .detail { padding:16px; max-width:820px; margin:0 auto; width:100%; }
+  .back-btn { background:none; border:none; font-size:14px; font-weight:600;
+              padding:4px 0 12px; cursor:pointer; }
+  .badges { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .badge { font-size:11px; padding:4px 10px; border-radius:999px; }
+  .badge.plain { background:#fff; border:1px solid #D8D2C0; color:#5A5648; }
+  .imgbox { width:100%; max-width:260px; aspect-ratio:1; background:#fff;
+            border:1px solid #D8D2C0; border-radius:14px; display:flex;
+            align-items:center; justify-content:center; overflow:hidden; margin-bottom:10px; }
+  .imgbox img { width:100%; height:100%; object-fit:cover; }
+  .placeholder { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .placeholder .circle { width:60px; height:60px; border-radius:999px; display:flex;
+                         align-items:center; justify-content:center; font-size:22px; font-weight:bold; }
+  .placeholder span { font-size:11px; color:#9A9382; }
+  .btnrow { display:flex; gap:8px; max-width:260px; margin-bottom:8px; }
+  .btn { flex:1; display:block; padding:11px; border-radius:8px; border:none;
+         font-size:13px; font-weight:600; color:#fff; cursor:pointer; text-align:center; }
+  .btn.ghost { background:#fff; border:1px solid #D8D2C0; color:#9A5A4A; }
+  .btn.outline { background:#fff; border:1px solid currentColor; }
+  h2.title { font-size:24px; margin:12px 0 4px; }
+  p.meta { font-size:13px; color:#8A8371; margin:0 0 12px; }
+  .memo { font-size:12px; padding:10px 12px; border-radius:8px; white-space:pre-line;
+          background:#FBF6E3; border:1px solid #EAD9A0; color:#7A6420; margin-bottom:16px; }
+  .matgroup { background:#fff; border:1px solid #E3DFD1; border-radius:10px;
+              margin-bottom:14px; overflow:hidden; }
+  .matgroup .gh { padding:9px 14px; font-size:13px; font-weight:bold; }
+  .matrow { padding:11px 14px; border-top:1px solid #F0EDE2; display:flex; gap:10px; align-items:flex-start; }
+  .matgroup .matrow:first-of-type { border-top:none; }
+  .matthumb { width:52px; height:52px; border-radius:6px; object-fit:cover;
+              border:1px solid #E3DFD1; flex-shrink:0; background:#F7F5EE; }
+  .matthumb.empty { display:flex; align-items:center; justify-content:center;
+                    font-size:10px; color:#B5AF9E; text-align:center; line-height:1.2; }
+  .matbody { flex:1; min-width:0; }
+  .matname { font-size:14px; font-weight:500; }
+  .tag { font-size:10px; font-weight:bold; padding:2px 6px; border-radius:4px; margin-left:6px; }
+  .supplier { font-size:12px; color:#9A9382; margin-top:3px; }
+  .matactions { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .minibtn { font-size:11px; padding:4px 9px; border-radius:6px; background:#fff;
+             border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
+  .status { font-size:12px; padding:8px 12px; border-radius:8px; margin-bottom:10px; max-width:400px; }
+  .status.err { background:#FDECE4; color:#B5552F; }
+  .status.ok { background:#E7F1E4; color:#3F7D4A; }
+  .status.info { background:#EFEDE4; color:#6B6558; }
+  .hidden { display:none !important; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50;
+              display:flex; align-items:flex-end; justify-content:center; }
+  .modal { background:#F3F1EA; width:100%; max-width:520px; border-radius:16px 16px 0 0;
+           padding:18px 16px 24px; max-height:88vh; overflow-y:auto; }
+  .modal h3 { margin:0 0 14px; font-size:16px; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:12px; font-weight:600; margin-bottom:5px; color:#5A5648; }
+  .field input, .field select, .field textarea {
+    width:100%; padding:9px 11px; border-radius:8px; border:1px solid #D8D2C0;
+    font-size:14px; background:#fff; font-family:inherit; }
+  .field textarea { min-height:64px; resize:vertical; }
+  .modal-actions { display:flex; gap:8px; margin-top:16px; }
+  .addbar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .gallery { display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; }
+  .gcard { flex:0 0 auto; width:190px; }
+  .gimg { width:190px; height:190px; background:#fff; border:1px solid #D8D2C0;
+          border-radius:12px; overflow:hidden; display:flex;
+          align-items:center; justify-content:center; }
+  .gimg img { width:100%; height:100%; object-fit:cover; }
+  .gacts { display:flex; gap:6px; margin-top:6px; }
+  .gacts .minibtn { flex:1; text-align:center; }
+  .editor-bg { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:80;
+               display:flex; align-items:center; justify-content:center; padding:12px; }
+  .editor { background:#F3F1EA; border-radius:14px; padding:12px;
+            max-width:800px; width:100%; max-height:94vh; overflow-y:auto; }
+  .etoolbar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .etool { padding:7px 13px; border-radius:8px; font-size:13px; font-weight:600;
+           background:#fff; border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
+  .etool.active { background:#3F7D4A; color:#fff; border-color:#3F7D4A; }
+  .ecolors { display:flex; gap:5px; }
+  .ecolor { width:26px; height:26px; border-radius:999px; border:2px solid #D8D2C0; cursor:pointer; padding:0; }
+  .ecolor.active { border-color:#2B2A24; transform:scale(1.15); }
+  .esizes { display:flex; gap:5px; margin-left:auto; }
+  .esize { padding:6px 10px; border-radius:7px; font-size:12px; background:#fff;
+           border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
+  .esize.active { background:#5A5648; color:#fff; border-color:#5A5648; }
+  .ebtn { padding:6px 12px; border-radius:7px; font-size:12px; background:#fff;
+          border:1px solid #D8D2C0; color:#5A5648; cursor:pointer; }
+  .ecanvas-wrap { display:flex; justify-content:center; background:#2B2A24;
+                  border-radius:10px; padding:8px; margin-bottom:10px; }
+  #ecanvas { max-width:100%; touch-action:none; border-radius:6px; cursor:crosshair; }
+  .eactions { display:flex; gap:8px; }
+  .eactions .btn { flex:1; }
+  .picker { max-height:210px; overflow-y:auto; border:1px solid #D8D2C0;
+            border-radius:8px; background:#fff; }
+  .pitem { width:100%; display:flex; gap:9px; align-items:center; text-align:left;
+           padding:8px 10px; background:none; border:none;
+           border-bottom:1px solid #F0EDE2; cursor:pointer; }
+  .pitem:last-child { border-bottom:none; }
+  .pitem.sel { background:#E7F1E4; }
+  .pthumb { width:38px; height:38px; border-radius:5px; object-fit:cover;
+            border:1px solid #E3DFD1; flex-shrink:0; background:#F7F5EE; }
+  .pthumb.empty { display:flex; align-items:center; justify-content:center;
+                  font-size:9px; color:#B5AF9E; text-align:center; line-height:1.15; }
+  .pbody { display:flex; flex-direction:column; min-width:0; }
+  .pname { font-size:13px; font-weight:500; color:#2B2A24; }
+  .pmeta { font-size:11px; color:#9A9382; margin-top:2px; }
+  @media (min-width:768px) {
+    #app { flex-direction:row; height:100vh; }
+    .sidebar { width:320px; flex-shrink:0; border-right:1px solid #D8D2C0;
+               display:flex; flex-direction:column; }
+    .main { flex:1; overflow-y:auto; }
+    .back-btn { display:none; }
+    .sidebar, .main { display:flex !important; }
+    .detail { padding:28px; }
+    .modal-bg { align-items:center; }
+    .modal { border-radius:16px; }
   }
 </style>
 </head>
@@ -111,7 +151,7 @@
     <div class="header">
       <h1>品目別 資材ビューア</h1>
       <p>商品を選ぶと使用資材が一覧表示されます</p>
-      <p style="margin-top:3px">※ 登録した写真は全員に共有されます</p>
+      <p style="margin-top:3px">※ 登録内容は全員に共有されます</p>
     </div>
     <div class="search-wrap">
       <input id="search" type="text" placeholder="品目名で検索..." />
@@ -121,14 +161,11 @@
   </div>
   <div class="main hidden" id="main"></div>
 </div>
-
+<div id="modalRoot"></div>
 <script>
-const DATA = [{"category":"南瓜","sale_type":"通常","item":"かぼちゃ","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":"南瓜は「南瓜ブロック」「南瓜スライス」に分けて整理。\n元データの「ブロック」「スライス」も南瓜として統一しています。"},{"category":"南瓜","sale_type":"通常","item":"かぼちゃ1/4","material_category":"ラップ","material_name":"i-PHM250_手巻きラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"レギュラー","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"予定数","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜スライス","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜ブロック","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"人参","sale_type":"通常","item":"にんじん1本","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":null},{"category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*320*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*400*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"大根","sale_type":"通常","item":"大根","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*330_#20_袋_大根上部","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"トレー","material_name":"FLB-A10-25W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"長芋","sale_type":"通常","item":"長芋","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"長芋","sale_type":"通常","item":"長芋","material_category":"フィルム","material_name":"#25 0.02*350*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"長芋","sale_type":"通常","item":"長芋","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"トレー","material_name":"FLB-V12-30W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラップ","material_name":"i-FA350_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"通常","item":"きゃべつ1/2","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"通常","item":"きゃべつ1/4","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/2","material_category":"専用シール","material_name":"春キャベツ1/2シール","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"予定数","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/4","material_category":"専用シール","material_name":"春キャベツ1/4シール","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"ラベル・シール","material_name":"15*25_産地小_無地ラベ","supplier":"高速","common_or_dedicated":"専用","memo":null},{"category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"専用シール","material_name":"ほうれん草専用","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"ほうれん草","sale_type":"レギュラー","item":"ほうれん草","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":null},{"category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"専用シール","material_name":"トマト小玉_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"ラップ","material_name":"i-FA300_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"その他","material_name":"APFC-V10-30M(V)ｴｺ","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"専用シール","material_name":"ミニトマトカップ_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"その他","material_name":"CFR250","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"トレー","material_name":"CFR100","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_産地なし","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_熊本産","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":null},{"category":null,"sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"ミックスぶどう","supplier":null,"common_or_dedicated":null,"memo":null},{"category":null,"sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"赤ぶどう","supplier":null,"common_or_dedicated":null,"memo":null},{"category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"ぶどう","sale_type":"通常","item":"スイートサファイア","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"ぶどう","sale_type":"通常","item":"スイートサファイア（黒）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"ぶどう","sale_type":"通常","item":"種なしぶどう(3色MIX)大パック","material_category":"その他","material_name":"GPR-M ６Ｈ","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"ぶどう","sale_type":"通常","item":"種なしぶどう（3色M）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ブラック）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ミックス）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"さつまいも","sale_type":"通常","item":"さつまいも","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"さつまいも","sale_type":"通常","item":"なると","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"きゅうり","sale_type":"IDF","item":"きゅうり","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"トレー","material_name":"QX-R-V13-30_黒トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"ラベル・シール","material_name":"アスパラ_ラベル","supplier":"協立包材","common_or_dedicated":"専用","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"クレソン","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":null},{"category":"その他","sale_type":"IDF","item":"IDF","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null},{"category":"その他","sale_type":"通常","item":"紅たて","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":null}];
-
+const SEED = [{"id":"m0","category":"南瓜","sale_type":"通常","item":"かぼちゃ","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":"南瓜は「南瓜ブロック」「南瓜スライス」に分けて整理。\n元データの「ブロック」「スライス」も南瓜として統一しています。"},{"id":"m1","category":"南瓜","sale_type":"通常","item":"かぼちゃ1/4","material_category":"ラップ","material_name":"i-PHM250_手巻きラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m2","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m3","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m4","category":"南瓜","sale_type":"通常","item":"南瓜スライス","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m5","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m6","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"トレー","material_name":"FLB-A15-25W_白トレー","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m7","category":"南瓜","sale_type":"通常","item":"南瓜ブロック","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m8","category":"南瓜","sale_type":"レギュラー","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m9","category":"南瓜","sale_type":"予定数","item":"輸入かぼちゃ1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m10","category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜スライス","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m11","category":"南瓜","sale_type":"レギュラー","item":"輸入南瓜ブロック","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m12","category":"人参","sale_type":"通常","item":"にんじん1本","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":""},{"id":"m13","category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*320*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m14","category":"人参","sale_type":"通常","item":"にんじん袋","material_category":"フィルム","material_name":"#30 0.02*400*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m15","category":"大根","sale_type":"通常","item":"大根","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m16","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*330_#20_袋_大根上部","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m17","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m18","category":"大根","sale_type":"通常","item":"大根上部・下部カット","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m19","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m20","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"トレー","material_name":"FLB-A10-25W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m21","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m22","category":"長芋","sale_type":"通常","item":"ネバリスター","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m23","category":"長芋","sale_type":"通常","item":"長芋","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m24","category":"長芋","sale_type":"通常","item":"長芋","material_category":"フィルム","material_name":"#25 0.02*350*2000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m25","category":"長芋","sale_type":"通常","item":"長芋","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m26","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m27","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"トレー","material_name":"FLB-V12-30W_白トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m28","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"ラップ","material_name":"i-FA350_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m29","category":"れんこん","sale_type":"通常","item":"れんこん","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m30","category":"キャベツ","sale_type":"通常","item":"きゃべつ1/2","material_category":"ラップ","material_name":"リケンハイラップ_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m31","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m32","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m33","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"ラベル・シール","material_name":"42*60_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m34","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m35","category":"キャベツ","sale_type":"通常","item":"きゃべつ1/4","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m36","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m37","category":"キャベツ","sale_type":"レギュラー","item":"きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m38","category":"キャベツ","sale_type":"予定数","item":"きゃべつ1/4","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m39","category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/2","material_category":"専用シール","material_name":"春キャベツ1/2シール","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m40","category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m41","category":"キャベツ","sale_type":"予定数","item":"春きゃべつ1/2","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m42","category":"キャベツ","sale_type":"通常","item":"春きゃべつ1/4","material_category":"専用シール","material_name":"春キャベツ1/4シール","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m43","category":"キャベツ","sale_type":"レギュラー","item":"春きゃべつ1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m44","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m45","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m46","category":"白菜","sale_type":"レギュラー","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m47","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラベル・シール","material_name":"20*30_産地大_無地ラベ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m48","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"ラップ","material_name":"FOBラップ_300_#20_機械ラップ","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m49","category":"白菜","sale_type":"予定数","item":"白菜1/4","material_category":"外箱","material_name":"92*60_外箱ピンク_予定数","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m50","category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"ラベル・シール","material_name":"15*25_産地小_無地ラベ","supplier":"高速","common_or_dedicated":"専用","memo":""},{"id":"m51","category":"ほうれん草","sale_type":"通常","item":"ほうれん草","material_category":"専用シール","material_name":"ほうれん草専用","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m52","category":"ほうれん草","sale_type":"レギュラー","item":"ほうれん草","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m53","category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m54","category":"ブロッコリー","sale_type":"予定数","item":"ブロッコリー1/2","material_category":"袋","material_name":"230*340_#20_袋_FG12号","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m55","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"専用シール","material_name":"トマト小玉_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m56","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"ラップ","material_name":"i-FA300_機械ラップ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m57","category":"トマト","sale_type":"通常","item":"トマト小玉","material_category":"その他","material_name":"APFC-V10-30M(V)ｴｺ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m58","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"専用シール","material_name":"ミニトマトカップ_ラベル","supplier":"トーシンウィング","common_or_dedicated":"専用","memo":""},{"id":"m59","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m60","category":"トマト","sale_type":"通常","item":"ミニトマトカップ","material_category":"その他","material_name":"CFR250","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m61","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m62","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"トレー","material_name":"CFR100","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m63","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_産地なし","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m64","category":"トマト","sale_type":"通常","item":"ミニトマト少量","material_category":"専用シール","material_name":"少量シール_熊本産","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m65","category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"ラベル・シール","material_name":"28*40_無地ラベ","supplier":"イシダ","common_or_dedicated":"共通","memo":""},{"id":"m66","category":"","sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"ミックスぶどう","supplier":"","common_or_dedicated":"","memo":""},{"id":"m67","category":"","sale_type":"通常","item":"ぶどう","material_category":"専用シール","material_name":"赤ぶどう","supplier":"","common_or_dedicated":"","memo":""},{"id":"m68","category":"ぶどう","sale_type":"通常","item":"ぶどう","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m69","category":"ぶどう","sale_type":"通常","item":"スイートサファイア","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m70","category":"ぶどう","sale_type":"通常","item":"スイートサファイア（黒）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m71","category":"ぶどう","sale_type":"通常","item":"種なしぶどう(3色MIX)大パック","material_category":"その他","material_name":"GPR-M ６Ｈ","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m72","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（3色M）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m73","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ブラック）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m74","category":"ぶどう","sale_type":"通常","item":"種なしぶどう（ミックス）","material_category":"その他","material_name":"ﾊﾞｲｵ　つみたてK　17-12穴10","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m75","category":"さつまいも","sale_type":"通常","item":"さつまいも","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m76","category":"さつまいも","sale_type":"通常","item":"なると","material_category":"袋","material_name":"180*330_#25_袋","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m77","category":"きゅうり","sale_type":"IDF","item":"きゅうり","material_category":"袋","material_name":"180*450_#20_袋_大根下部","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m78","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"トレー","material_name":"QX-R-V13-30_黒トレー","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m79","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"ラップ","material_name":"i-US350_機械ラップ","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m80","category":"香味・つまもの","sale_type":"通常","item":"にんにく","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m81","category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"ラベル・シール","material_name":"アスパラ_ラベル","supplier":"協立包材","common_or_dedicated":"専用","memo":""},{"id":"m82","category":"香味・つまもの","sale_type":"通常","item":"アスパラ","material_category":"フィルム","material_name":"#25 0.02*250*1000_フィルム","supplier":"トーシンウィング","common_or_dedicated":"共通","memo":""},{"id":"m83","category":"香味・つまもの","sale_type":"通常","item":"クレソン","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m84","category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m85","category":"香味・つまもの","sale_type":"通常","item":"小菊","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m86","category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"緩衝材","material_name":"ウレタン白　8mm厚　60×100　","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m87","category":"香味・つまもの","sale_type":"通常","item":"穂じそ","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m88","category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m89","category":"香味・つまもの","sale_type":"通常","item":"紅たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m90","category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"緩衝材","material_name":"ウレタン白　11mm厚　60×100","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m91","category":"香味・つまもの","sale_type":"通常","item":"青たで","material_category":"その他","material_name":"ﾀﾌﾄﾚｰ45B　新","supplier":"協立包材","common_or_dedicated":"共通","memo":""},{"id":"m92","category":"その他","sale_type":"IDF","item":"IDF","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""},{"id":"m93","category":"その他","sale_type":"通常","item":"紅たて","material_category":"外箱","material_name":"92*60_外箱白_レギュラー","supplier":"高速","common_or_dedicated":"共通","memo":""}];
 const IMGBB_KEY = "c650c72c1e1d8d48196df9f894c44187";
 const JSONBIN_KEY = "$2a$10$.TU5hEqu5Rp77MXFTO.uLePLeVtkYQCR7XQTll37kXIGFVs50KZZ6";
-// Bin ID is created automatically on first use and remembered in this file's
-// localStorage; the shared copy below is filled in once you paste it back.
 let BIN_ID = "";
 
 const CATEGORY_COLORS = {
@@ -137,127 +174,652 @@ const CATEGORY_COLORS = {
   "ブロッコリー":"#3E7053","トマト":"#C4432E","ぶどう":"#6B4E8E","さつまいも":"#9B5B3F",
   "きゅうり":"#4C8C3C","香味・つまもの":"#5E8C5A","その他":"#7A7568"
 };
-const color = c => CATEGORY_COLORS[c] || "#6B6558";
-
-// ---- build item index ----
-const itemMap = new Map();
-for (const r of DATA) {
-  if (!r.item) continue;
-  if (!itemMap.has(r.item)) {
-    itemMap.set(r.item, { item: r.item, category: r.category, saleTypes: new Set(), materials: [], memo: null });
-  }
-  const e = itemMap.get(r.item);
-  if (r.category && !e.category) e.category = r.category;
-  if (r.sale_type) e.saleTypes.add(r.sale_type);
-  if (r.memo) e.memo = r.memo;
-  e.materials.push(r);
+const PALETTE = ["#C96A2E","#5B8C4A","#6B4E8E","#C4432E","#3F7D4A","#A8895A","#4C8C3C","#7A7568"];
+function color(c) {
+  if (CATEGORY_COLORS[c]) return CATEGORY_COLORS[c];
+  if (!c) return "#6B6558";
+  let h = 0;
+  for (let i = 0; i < c.length; i++) h = (h * 31 + c.charCodeAt(i)) % 9973;
+  return PALETTE[h % PALETTE.length];
 }
-const ITEMS = [...itemMap.values()];
-const CATS = [...new Set(ITEMS.map(i => i.category || "その他"))];
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-let images = {};
-let selected = ITEMS[0] ? ITEMS[0].item : null;
+// ---------- state ----------
+let rows = [];            // material rows (editable)
+let itemPhotos = {};      // item name -> array of image urls (multiple photos per item)
+
+// Older saved data stored a single URL string per item. Normalise both shapes
+// to an array so the rest of the code only ever deals with lists.
+function photosOf(item) {
+  const v = itemPhotos[item];
+  if (!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
+function setPhotosOf(item, list) {
+  if (!list || !list.length) delete itemPhotos[item];
+  else itemPhotos[item] = list;
+}
+function migratePhotos() {
+  for (const k of Object.keys(itemPhotos)) {
+    if (!Array.isArray(itemPhotos[k])) itemPhotos[k] = [itemPhotos[k]];
+  }
+}
+let matPhotos = {};       // material NAME -> image url (shared across all items using it)
+let selected = null;
 let activeCat = "全て";
 let query = "";
 let busy = false;
 let status = null;
+let modal = null;
 
-// ---- storage ----
-function localBin() { try { return localStorage.getItem("pmv_bin_id") || ""; } catch(e) { return ""; } }
-function saveLocalBin(id) { try { localStorage.setItem("pmv_bin_id", id); } catch(e) {} }
+function newId() { return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+// ---------- derived ----------
+function buildItems() {
+  const map = new Map();
+  for (const r of rows) {
+    if (!r.item) continue;
+    if (!map.has(r.item)) {
+      map.set(r.item, { item:r.item, category:r.category, saleTypes:new Set(), materials:[], memo:"" });
+    }
+    const e = map.get(r.item);
+    if (r.category && !e.category) e.category = r.category;
+    if (r.sale_type) e.saleTypes.add(r.sale_type);
+    if (r.memo && !e.memo) e.memo = r.memo;
+    e.materials.push(r);
+  }
+  return map;
+}
+let itemMap = new Map();
+function refreshItems() {
+  itemMap = buildItems();
+  if (!itemMap.has(selected)) selected = itemMap.keys().next().value || null;
+}
+function allCats() {
+  return [...new Set([...itemMap.values()].map(i => i.category || "その他"))];
+}
+
+// ---------- storage ----------
+function localBin(){ try { return localStorage.getItem("pmv_bin_id")||""; } catch(e){ return ""; } }
+function saveLocalBin(id){ try { localStorage.setItem("pmv_bin_id", id); } catch(e){} }
 
 async function ensureBin() {
   if (BIN_ID) return BIN_ID;
   const cached = localBin();
   if (cached) { BIN_ID = cached; return BIN_ID; }
   const res = await fetch("https://api.jsonbin.io/v3/b", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY, "X-Bin-Name": "pmv-images" },
-    body: JSON.stringify({ images: {} })
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "X-Master-Key":JSONBIN_KEY, "X-Bin-Name":"pmv-data" },
+    body: JSON.stringify({ rows: SEED, itemPhotos:{}, matPhotos:{} })
   });
   const d = await res.json();
-  if (!res.ok) throw new Error(d.message || "Bin作成に失敗");
+  if (!res.ok) throw new Error(d.message || "保存先の作成に失敗");
   BIN_ID = d.metadata.id;
   saveLocalBin(BIN_ID);
   return BIN_ID;
 }
 
-async function loadImages() {
+async function loadAll() {
   try {
     const id = BIN_ID || localBin();
-    if (!id) return;
+    if (!id) { rows = SEED.slice(); refreshItems(); render(); return; }
     BIN_ID = id;
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
-      headers: { "X-Master-Key": JSONBIN_KEY }
+    const res = await fetch("https://api.jsonbin.io/v3/b/" + id + "/latest", {
+      headers:{ "X-Master-Key":JSONBIN_KEY }
     });
     const d = await res.json();
-    if (res.ok && d.record && d.record.images) { images = d.record.images; render(); }
-  } catch (e) { console.error(e); }
+    if (res.ok && d.record) {
+      rows = Array.isArray(d.record.rows) && d.record.rows.length ? d.record.rows : SEED.slice();
+      itemPhotos = d.record.itemPhotos || {};
+      migratePhotos();
+      matPhotos = d.record.matPhotos || {};
+    } else {
+      rows = SEED.slice();
+    }
+  } catch (e) {
+    console.error(e);
+    rows = SEED.slice();
+  }
+  refreshItems();
+  render();
 }
 
-async function saveImages() {
+async function saveAll() {
   const id = await ensureBin();
-  const res = await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY },
-    body: JSON.stringify({ images })
+  const res = await fetch("https://api.jsonbin.io/v3/b/" + id, {
+    method:"PUT",
+    headers:{ "Content-Type":"application/json", "X-Master-Key":JSONBIN_KEY },
+    body: JSON.stringify({ rows, itemPhotos, matPhotos })
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.message || "保存に失敗"); }
+  if (!res.ok) {
+    let msg = "保存に失敗";
+    try { const d = await res.json(); msg = d.message || msg; } catch(e){}
+    throw new Error(msg);
+  }
 }
 
-async function uploadToImgbb(file) {
-  const b64 = await new Promise((res, rej) => {
+async function withSave(fn, okMsg) {
+  busy = true; status = null; render();
+  try {
+    await fn();
+    await saveAll();
+    status = { type:"ok", msg: okMsg || "保存しました" };
+  } catch (e) {
+    console.error(e);
+    status = { type:"err", msg: "エラー: " + e.message };
+  } finally {
+    busy = false; refreshItems(); render();
+  }
+}
+
+// ---------- image upload ----------
+function shrink(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => res(String(r.result).split(",")[1]);
-    r.onerror = rej;
+    r.onerror = () => reject(new Error("読み込み失敗"));
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("画像を読めません"));
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL("image/jpeg", quality).split(",")[1]);
+      };
+      img.src = r.result;
+    };
     r.readAsDataURL(file);
   });
+}
+
+async function uploadImage(file) {
+  const b64 = await shrink(file, 1200, 0.82);
   const fd = new FormData();
   fd.append("image", b64);
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method: "POST", body: fd });
+  const res = await fetch("https://api.imgbb.com/1/upload?key=" + IMGBB_KEY, { method:"POST", body:fd });
   const d = await res.json();
-  if (!d.success) throw new Error("画像アップロードに失敗");
+  if (!d || !d.success) throw new Error("画像アップロードに失敗");
   return d.data.url;
 }
 
-async function handleFile(file) {
-  if (!file || !file.type.startsWith("image/")) return;
-  busy = true; status = null; render();
-  try {
-    const url = await uploadToImgbb(file);
-    images[selected] = url;
-    await saveImages();
-    status = { type: "ok", msg: "登録しました" };
-  } catch (e) {
-    console.error(e);
-    status = { type: "err", msg: "エラー: " + e.message };
-  } finally { busy = false; render(); }
+// Opens a file input. useCamera=true asks the OS for the camera directly.
+function pickFile(useCamera) {
+  return new Promise(resolve => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    if (useCamera) inp.setAttribute("capture", "environment");
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0];
+      document.body.removeChild(inp);
+      resolve(f || null);
+    };
+    inp.click();
+  });
 }
 
-async function removeImage() {
-  busy = true; status = null; render();
-  try {
-    delete images[selected];
-    await saveImages();
-    status = { type: "ok", msg: "削除しました" };
-  } catch (e) {
-    status = { type: "err", msg: "エラー: " + e.message };
-  } finally { busy = false; render(); }
+// ---------- photo annotation editor ----------
+// Opens after a photo is picked (or from "書き込む" on an existing photo).
+// Resolves to a Blob of the annotated image, or null if cancelled.
+function annotateImage(src) {
+  return new Promise(resolve => {
+    const wrap = document.createElement("div");
+    wrap.className = "editor-bg";
+    wrap.innerHTML =
+      '<div class="editor">' +
+        '<div class="etoolbar">' +
+          '<button class="etool active" data-tool="draw">手書き</button>' +
+          '<button class="etool" data-tool="arrow">矢印</button>' +
+          '<button class="etool" data-tool="rect">囲み</button>' +
+          '<button class="etool" data-tool="text">文字</button>' +
+        '</div>' +
+        '<div class="etoolbar">' +
+          '<span class="ecolors">' +
+            '<button class="ecolor active" data-color="#E03131" style="background:#E03131"></button>' +
+            '<button class="ecolor" data-color="#1971C2" style="background:#1971C2"></button>' +
+            '<button class="ecolor" data-color="#2F9E44" style="background:#2F9E44"></button>' +
+            '<button class="ecolor" data-color="#F08C00" style="background:#F08C00"></button>' +
+            '<button class="ecolor" data-color="#FFFFFF" style="background:#FFFFFF"></button>' +
+            '<button class="ecolor" data-color="#000000" style="background:#000000"></button>' +
+          '</span>' +
+          '<span class="esizes">' +
+            '<button class="esize" data-size="3">細</button>' +
+            '<button class="esize active" data-size="6">中</button>' +
+            '<button class="esize" data-size="11">太</button>' +
+          '</span>' +
+          '<button class="ebtn" id="eundo">戻す</button>' +
+        '</div>' +
+        '<div class="ecanvas-wrap"><canvas id="ecanvas"></canvas></div>' +
+        '<div class="eactions">' +
+          '<button class="btn" id="ecancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>' +
+          '<button class="btn" id="edone" style="background:#3F7D4A">この内容で登録</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    const canvas = wrap.querySelector("#ecanvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    let tool = "draw", stroke = "#E03131", size = 6;
+    let strokes = [];          // committed shapes
+    let active = null;         // in-progress shape
+    let baseReady = false;
+
+    function fit() {
+      const maxW = Math.min(window.innerWidth - 32, 760);
+      const maxH = window.innerHeight * 0.56;
+      let w = img.width, h = img.height;
+      const r = Math.min(maxW / w, maxH / h, 1);
+      canvas.width = Math.round(w * r);
+      canvas.height = Math.round(h * r);
+    }
+
+    function redraw() {
+      if (!baseReady) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const all = active ? strokes.concat([active]) : strokes;
+      for (const s of all) drawShape(s);
+    }
+
+    function drawShape(s) {
+      ctx.save();
+      ctx.strokeStyle = s.color;
+      ctx.fillStyle = s.color;
+      ctx.lineWidth = s.size;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (s.type === "draw") {
+        ctx.beginPath();
+        s.pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+        ctx.stroke();
+      } else if (s.type === "rect") {
+        ctx.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
+      } else if (s.type === "arrow") {
+        const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+        const ang = Math.atan2(dy, dx);
+        const head = Math.max(12, s.size * 3.2);
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(s.x2, s.y2);
+        ctx.lineTo(s.x2 - head * Math.cos(ang - Math.PI/7), s.y2 - head * Math.sin(ang - Math.PI/7));
+        ctx.lineTo(s.x2 - head * Math.cos(ang + Math.PI/7), s.y2 - head * Math.sin(ang + Math.PI/7));
+        ctx.closePath();
+        ctx.fill();
+      } else if (s.type === "text") {
+        const fs = Math.max(16, s.size * 4);
+        ctx.font = "bold " + fs + "px 'Hiragino Sans','Yu Gothic',sans-serif";
+        ctx.textBaseline = "top";
+        ctx.lineWidth = Math.max(3, fs / 7);
+        ctx.strokeStyle = (s.color.toUpperCase() === "#FFFFFF") ? "#000000" : "#FFFFFF";
+        const lines = String(s.text).split("\n");
+        lines.forEach((ln, i) => {
+          const y = s.y1 + i * fs * 1.25;
+          ctx.strokeText(ln, s.x1, y);
+          ctx.fillText(ln, s.x1, y);
+        });
+      }
+      ctx.restore();
+    }
+
+    function pos(e) {
+      const r = canvas.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return {
+        x: (t.clientX - r.left) * (canvas.width / r.width),
+        y: (t.clientY - r.top) * (canvas.height / r.height)
+      };
+    }
+
+    function start(e) {
+      if (!baseReady) return;
+      e.preventDefault();
+      const p = pos(e);
+      if (tool === "text") {
+        const txt = prompt("画像に入れる文字を入力してください");
+        if (txt && txt.trim()) {
+          strokes.push({ type:"text", text:txt.trim(), x1:p.x, y1:p.y, color:stroke, size:size });
+          redraw();
+        }
+        return;
+      }
+      active = (tool === "draw")
+        ? { type:"draw", pts:[p], color:stroke, size:size }
+        : { type:tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:stroke, size:size };
+      redraw();
+    }
+    function move(e) {
+      if (!active) return;
+      e.preventDefault();
+      const p = pos(e);
+      if (active.type === "draw") active.pts.push(p);
+      else { active.x2 = p.x; active.y2 = p.y; }
+      redraw();
+    }
+    function end() {
+      if (!active) return;
+      const a = active;
+      active = null;
+      const tiny = a.type !== "draw" &&
+        Math.abs(a.x2 - a.x1) < 4 && Math.abs(a.y2 - a.y1) < 4;
+      if (!tiny) strokes.push(a);
+      redraw();
+    }
+
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    canvas.addEventListener("touchstart", start, { passive:false });
+    canvas.addEventListener("touchmove", move, { passive:false });
+    canvas.addEventListener("touchend", end);
+
+    wrap.querySelectorAll(".etool").forEach(b => b.onclick = () => {
+      tool = b.dataset.tool;
+      wrap.querySelectorAll(".etool").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+    });
+    wrap.querySelectorAll(".ecolor").forEach(b => b.onclick = () => {
+      stroke = b.dataset.color;
+      wrap.querySelectorAll(".ecolor").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+    });
+    wrap.querySelectorAll(".esize").forEach(b => b.onclick = () => {
+      size = Number(b.dataset.size);
+      wrap.querySelectorAll(".esize").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+    });
+    wrap.querySelector("#eundo").onclick = () => { strokes.pop(); redraw(); };
+
+    function cleanup() {
+      window.removeEventListener("mouseup", end);
+      document.body.removeChild(wrap);
+    }
+    wrap.querySelector("#ecancel").onclick = () => { cleanup(); resolve(null); };
+    wrap.querySelector("#edone").onclick = () => {
+      canvas.toBlob(b => { cleanup(); resolve(b); }, "image/jpeg", 0.88);
+    };
+
+    img.onload = () => { baseReady = true; fit(); redraw(); };
+    img.onerror = () => { cleanup(); resolve(null); };
+    img.src = src;
+  });
 }
 
-// ---- render ----
+function blobToUrlSrc(fileOrBlob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(fileOrBlob);
+  });
+}
+
+async function setPhoto(target, key, useCamera) {
+  const file = await pickFile(useCamera);
+  if (!file) return;
+  let src;
+  try { src = await blobToUrlSrc(file); }
+  catch (e) { status = { type:"err", msg:"画像を読めませんでした" }; render(); return; }
+  const edited = await annotateImage(src);
+  if (!edited) return;
+  await withSave(async () => {
+    const url = await uploadImage(edited);
+    if (target === "item") setPhotosOf(key, photosOf(key).concat([url]));
+    else matPhotos[key] = url;
+  }, "写真を登録しました");
+}
+
+// Re-open the editor on a photo that is already registered.
+// For items, idx selects which of the item's photos to edit.
+async function annotateExisting(target, key, idx) {
+  const cur = target === "item" ? photosOf(key)[idx] : matPhotos[key];
+  if (!cur) return;
+  const edited = await annotateImage(cur);
+  if (!edited) return;
+  await withSave(async () => {
+    const url = await uploadImage(edited);
+    if (target === "item") {
+      const list = photosOf(key).slice();
+      list[idx] = url;
+      setPhotosOf(key, list);
+    } else matPhotos[key] = url;
+  }, "書き込みを保存しました");
+}
+
+async function clearPhoto(target, key, idx) {
+  await withSave(async () => {
+    if (target === "item") {
+      const list = photosOf(key).slice();
+      list.splice(idx, 1);
+      setPhotosOf(key, list);
+    } else delete matPhotos[key];
+  }, "写真を削除しました");
+}
+
+// ---------- modals ----------
+function openModal(cfg) { modal = cfg; renderModal(); }
+function closeModal() { modal = null; renderModal(); }
+
+function itemFormModal(existingItem) {
+  const cur = existingItem ? itemMap.get(existingItem) : null;
+  const first = cur ? cur.materials[0] : null;
+  openModal({
+    title: cur ? "品目を編集" : "品目を追加",
+    fields: [
+      { key:"item", label:"品目名", value: cur ? cur.item : "", required:true },
+      { key:"category", label:"商品分類", value: cur ? (cur.category||"") : "", list: allCats() },
+      { key:"sale_type", label:"販売区分", value: first ? (first.sale_type||"通常") : "通常",
+        list:["通常","レギュラー","予定数","IDF"] },
+      { key:"memo", label:"メモ(任意)", value: cur ? (cur.memo||"") : "", textarea:true },
+    ],
+    onSubmit: async vals => {
+      if (!vals.item.trim()) throw new Error("品目名を入力してください");
+      await withSave(async () => {
+        if (cur) {
+          const oldName = cur.item;
+          for (const r of rows) {
+            if (r.item === oldName) {
+              r.item = vals.item.trim();
+              r.category = vals.category.trim();
+              r.memo = vals.memo;
+            }
+          }
+          if (oldName !== vals.item.trim() && itemPhotos[oldName]) {
+            setPhotosOf(vals.item.trim(), photosOf(oldName));
+            delete itemPhotos[oldName];
+          }
+          selected = vals.item.trim();
+        } else {
+          const id = newId();
+          rows.push({
+            id, item: vals.item.trim(), category: vals.category.trim(),
+            sale_type: vals.sale_type.trim(), material_category:"未分類",
+            material_name:"(資材を追加してください)", supplier:"",
+            common_or_dedicated:"", memo: vals.memo
+          });
+          selected = vals.item.trim();
+        }
+      }, cur ? "品目を更新しました" : "品目を追加しました");
+    }
+  });
+}
+
+// Unique materials across every item, so an existing one can be reused
+// instead of retyped. Photos are keyed by name, so reuse brings the photo too.
+function knownMaterials() {
+  const map = new Map();
+  for (const r of rows) {
+    const n = (r.material_name || "").trim();
+    if (!n || n === "(資材を追加してください)") continue;
+    if (!map.has(n)) {
+      map.set(n, {
+        material_name: n,
+        material_category: r.material_category || "",
+        supplier: r.supplier || "",
+        common_or_dedicated: r.common_or_dedicated || "",
+        uses: 0
+      });
+    }
+    map.get(n).uses++;
+  }
+  return [...map.values()].sort((a,b) => b.uses - a.uses || a.material_name.localeCompare(b.material_name, "ja"));
+}
+
+function materialFormModal(existingRow) {
+  const cur = itemMap.get(selected);
+  const matCats = [...new Set(rows.map(r => r.material_category).filter(Boolean))];
+  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))];
+  const usedHere = new Set(cur.materials.map(m => m.material_name));
+  const reusable = existingRow ? [] : knownMaterials().filter(k => !usedHere.has(k.material_name));
+  openModal({
+    title: existingRow ? "資材を編集" : "資材を追加",
+    picker: reusable,
+    fields: [
+      { key:"material_name", label:"資材名・型番", value: existingRow ? existingRow.material_name : "", required:true },
+      { key:"material_category", label:"資材区分", value: existingRow ? existingRow.material_category : "", list: matCats },
+      { key:"supplier", label:"仕入先", value: existingRow ? existingRow.supplier : "", list: suppliers },
+      { key:"common_or_dedicated", label:"共通/専用", value: existingRow ? existingRow.common_or_dedicated : "共通",
+        list:["共通","専用"] },
+      { key:"sale_type", label:"販売区分", value: existingRow ? existingRow.sale_type : "通常",
+        list:["通常","レギュラー","予定数","IDF"] },
+    ],
+    onSubmit: async vals => {
+      if (!vals.material_name.trim()) throw new Error("資材名を入力してください");
+      await withSave(async () => {
+        if (existingRow) {
+          Object.assign(existingRow, {
+            material_name: vals.material_name.trim(),
+            material_category: vals.material_category.trim() || "未分類",
+            supplier: vals.supplier.trim(),
+            common_or_dedicated: vals.common_or_dedicated.trim(),
+            sale_type: vals.sale_type.trim()
+          });
+        } else {
+          rows.push({
+            id: newId(), item: cur.item, category: cur.category || "",
+            sale_type: vals.sale_type.trim(),
+            material_category: vals.material_category.trim() || "未分類",
+            material_name: vals.material_name.trim(),
+            supplier: vals.supplier.trim(),
+            common_or_dedicated: vals.common_or_dedicated.trim(), memo:""
+          });
+        }
+        // drop the auto placeholder row once a real material exists
+        const ph = rows.filter(r => r.item === cur.item && r.material_name === "(資材を追加してください)");
+        if (ph.length && rows.filter(r => r.item === cur.item).length > ph.length) {
+          for (const p of ph) rows.splice(rows.indexOf(p), 1);
+        }
+      }, existingRow ? "資材を更新しました" : "資材を追加しました");
+    }
+  });
+}
+
+function confirmModal(title, msg, onYes) {
+  openModal({ title, message: msg, fields: [], danger:true, onSubmit: async () => { await onYes(); } });
+}
+
+function renderModal() {
+  const root = document.getElementById("modalRoot");
+  if (!modal) { root.innerHTML = ""; return; }
+  const c = color(itemMap.get(selected) ? itemMap.get(selected).category : "");
+  let html = '<div class="modal-bg" id="mbg"><div class="modal">';
+  html += "<h3>" + esc(modal.title) + "</h3>";
+  if (modal.message) html += '<p style="font-size:13px;color:#5A5648;margin:0 0 12px">' + esc(modal.message) + "</p>";
+  if (modal.picker && modal.picker.length) {
+    html += '<div class="field"><label>登録済みの資材から選ぶ(任意)</label>';
+    html += '<div class="picker" id="picker">';
+    for (const k of modal.picker) {
+      const ph = matPhotos[k.material_name];
+      const thumb = ph
+        ? '<img class="pthumb" src="' + esc(ph) + '" onerror="this.style.display=\'none\'" />'
+        : '<div class="pthumb empty">写真<br>なし</div>';
+      html += '<button type="button" class="pitem" data-pick="' + esc(k.material_name) + '">' +
+        thumb +
+        '<span class="pbody"><span class="pname">' + esc(k.material_name) + '</span>' +
+        '<span class="pmeta">' + esc(k.material_category || "区分なし") +
+        (k.supplier ? " ・ " + esc(k.supplier) : "") +
+        " ・ " + k.uses + "品目で使用</span></span></button>";
+    }
+    html += "</div>";
+    html += '<p style="font-size:11px;color:#9A9382;margin:6px 0 0">タップすると下の欄が自動入力されます。写真も引き継がれます。</p>';
+    html += "</div>";
+  }
+  for (const f of (modal.fields || [])) {
+    html += '<div class="field"><label>' + esc(f.label) + "</label>";
+    if (f.textarea) {
+      html += '<textarea id="f_' + f.key + '">' + esc(f.value) + "</textarea>";
+    } else if (f.list && f.list.length) {
+      html += '<input id="f_' + f.key + '" value="' + esc(f.value) + '" list="dl_' + f.key + '" />';
+      html += '<datalist id="dl_' + f.key + '">';
+      for (const o of f.list) html += "<option>" + esc(o) + "</option>";
+      html += "</datalist>";
+    } else {
+      html += '<input id="f_' + f.key + '" value="' + esc(f.value) + '" />';
+    }
+    html += "</div>";
+  }
+  html += '<div class="modal-actions">';
+  html += '<button class="btn" id="mcancel" style="background:#fff;border:1px solid #D8D2C0;color:#5A5648">キャンセル</button>';
+  html += '<button class="btn" id="mok" style="background:' + (modal.danger ? "#B5552F" : c) + '">' +
+          (modal.danger ? "削除する" : "保存") + "</button>";
+  html += "</div></div></div>";
+  root.innerHTML = html;
+
+  root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
+    const k = (modal.picker || []).find(x => x.material_name === b.dataset.pick);
+    if (!k) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set("f_material_name", k.material_name);
+    set("f_material_category", k.material_category);
+    set("f_supplier", k.supplier);
+    set("f_common_or_dedicated", k.common_or_dedicated || "共通");
+    root.querySelectorAll("[data-pick]").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+  });
+
+  document.getElementById("mcancel").onclick = closeModal;
+  document.getElementById("mbg").onclick = e => { if (e.target.id === "mbg") closeModal(); };
+  document.getElementById("mok").onclick = async () => {
+    const vals = {};
+    for (const f of (modal.fields || [])) {
+      const el = document.getElementById("f_" + f.key);
+      vals[f.key] = el ? el.value : "";
+    }
+    const fn = modal.onSubmit;
+    closeModal();
+    try { await fn(vals); }
+    catch (e) { status = { type:"err", msg:"エラー: " + e.message }; render(); }
+  };
+}
+
+// ---------- render ----------
 function filtered() {
-  let pool = ITEMS;
+  let pool = [...itemMap.values()];
   if (activeCat !== "全て") pool = pool.filter(i => (i.category || "その他") === activeCat);
-  if (query.trim()) pool = pool.filter(i => i.item.toLowerCase().includes(query.trim().toLowerCase()));
+  if (query.trim()) {
+    const q = query.trim().toLowerCase();
+    pool = pool.filter(i => i.item.toLowerCase().includes(q));
+  }
   return pool;
 }
 
 function renderCats() {
   const el = document.getElementById("cats");
   el.innerHTML = "";
-  const all = ["全て", ...CATS];
-  for (const c of all) {
+  for (const c of ["全て", ...allCats()]) {
     const b = document.createElement("button");
     b.className = "cat-btn" + (activeCat === c ? " active" : "");
     b.textContent = c;
@@ -270,35 +832,44 @@ function renderCats() {
 function renderList() {
   const el = document.getElementById("list");
   el.innerHTML = "";
+
+  const add = document.createElement("button");
+  add.className = "item-btn";
+  add.style.color = "#3F7D4A";
+  add.style.fontWeight = "600";
+  add.innerHTML = '<span class="left">＋ 品目を追加</span>';
+  add.onclick = () => itemFormModal(null);
+  el.appendChild(add);
+
   const pool = filtered();
+  if (!pool.length) {
+    el.insertAdjacentHTML("beforeend",
+      '<div style="padding:24px;text-align:center;font-size:13px;color:#9A9382">該当する品目がありません</div>');
+    return;
+  }
   const byCat = new Map();
   for (const i of pool) {
     const c = i.category || "その他";
     if (!byCat.has(c)) byCat.set(c, []);
     byCat.get(c).push(i);
   }
-  if (!pool.length) {
-    el.innerHTML = '<div style="padding:24px;text-align:center;font-size:13px;color:#9A9382">該当する品目がありません</div>';
-    return;
-  }
   for (const [c, list] of byCat) {
     const h = document.createElement("div");
     h.className = "cat-head";
     h.style.color = color(c);
-    h.innerHTML = `<span class="dot" style="background:${color(c)}"></span>${c}`;
+    h.innerHTML = '<span class="dot" style="background:' + color(c) + '"></span>' + esc(c);
     el.appendChild(h);
     for (const i of list) {
       const b = document.createElement("button");
       b.className = "item-btn";
       if (selected === i.item) {
-        b.style.background = "#fff";
-        b.style.color = "#2B2A24";
-        b.style.fontWeight = "600";
-        b.style.borderLeftColor = color(c);
+        b.style.background = "#fff"; b.style.color = "#2B2A24";
+        b.style.fontWeight = "600"; b.style.borderLeftColor = color(c);
       }
-      const thumb = images[i.item]
-        ? `<img class="thumb" src="${images[i.item]}" onerror="this.style.display='none'" />` : "";
-      b.innerHTML = `<span class="left">${thumb}${i.item}</span><span class="count">${i.materials.length}</span>`;
+      const firstPhoto = photosOf(i.item)[0];
+      const th = firstPhoto
+        ? '<img class="thumb" src="' + esc(firstPhoto) + '" onerror="this.style.display=\'none\'" />' : "";
+      b.innerHTML = '<span class="left">' + th + esc(i.item) + '</span><span class="count">' + i.materials.length + "</span>";
       b.onclick = () => {
         selected = i.item; status = null;
         if (window.innerWidth < 768) {
@@ -315,75 +886,146 @@ function renderList() {
 function renderDetail() {
   const el = document.getElementById("main");
   const cur = itemMap.get(selected);
-  if (!cur) { el.innerHTML = ""; return; }
+  if (!cur) {
+    el.innerHTML = '<div class="detail"><p style="color:#9A9382;font-size:14px">左のリストから品目を選ぶか、「＋ 品目を追加」で新規登録してください。</p></div>';
+    return;
+  }
   const c = color(cur.category);
 
   const byMat = new Map();
   for (const m of cur.materials) {
-    const k = m.material_category || "その他";
+    const k = m.material_category || "未分類";
     if (!byMat.has(k)) byMat.set(k, []);
     byMat.get(k).push(m);
   }
 
   let matHtml = "";
   for (const [k, list] of byMat) {
-    let rows = "";
+    let rowsHtml = "";
     for (const m of list) {
       const isCommon = m.common_or_dedicated === "共通";
-      rows += `<div class="matrow">
-        <div><span class="matname">${m.material_name || ""}</span>
-        <span class="tag" style="background:${isCommon ? "#E7F1E4" : "#FDECE4"};color:${isCommon ? "#3F7D4A" : "#B5552F"}">${m.common_or_dedicated || "-"}</span></div>
-        <div class="supplier">${m.supplier || "仕入先未登録"}</div>
-      </div>`;
+      const p = matPhotos[m.material_name];
+      const thumb = p
+        ? '<img class="matthumb" src="' + esc(p) + '" onerror="this.style.display=\'none\'" />'
+        : '<div class="matthumb empty">写真<br>なし</div>';
+      rowsHtml += '<div class="matrow">' + thumb + '<div class="matbody">' +
+        '<div><span class="matname">' + esc(m.material_name) + "</span>" +
+        (m.common_or_dedicated
+          ? '<span class="tag" style="background:' + (isCommon ? "#E7F1E4" : "#FDECE4") +
+            ';color:' + (isCommon ? "#3F7D4A" : "#B5552F") + '">' + esc(m.common_or_dedicated) + "</span>"
+          : "") +
+        "</div>" +
+        '<div class="supplier">' + esc(m.supplier || "仕入先未登録") + "</div>" +
+        '<div class="matactions">' +
+          '<button class="minibtn" data-mp="' + esc(m.material_name) + '">写真を選ぶ</button>' +
+          '<button class="minibtn" data-mc="' + esc(m.material_name) + '">カメラ</button>' +
+          (p ? '<button class="minibtn" data-mw="' + esc(m.material_name) + '">書き込む</button>' : "") +
+          (p ? '<button class="minibtn" data-mx="' + esc(m.material_name) + '">写真削除</button>' : "") +
+          '<button class="minibtn" data-me="' + m.id + '">編集</button>' +
+          '<button class="minibtn" data-md="' + m.id + '" style="color:#B5552F">削除</button>' +
+        "</div></div></div>";
     }
-    matHtml += `<div class="matgroup">
-      <div class="gh" style="background:${c}1F;color:${c}">${k}</div>${rows}</div>`;
+    matHtml += '<div class="matgroup"><div class="gh" style="background:' + c + '1F;color:' + c + '">' +
+      esc(k) + "</div>" + rowsHtml + "</div>";
   }
 
-  const imgHtml = images[cur.item]
-    ? `<img src="${images[cur.item]}" alt="${cur.item}" />`
-    : `<div class="placeholder"><div class="circle" style="background:${c}22;color:${c}">${cur.item.slice(0,1)}</div><span>画像未登録</span></div>`;
+  const photos = photosOf(cur.item);
+  let galleryHtml;
+  if (photos.length) {
+    galleryHtml = '<div class="gallery">';
+    photos.forEach((u, i) => {
+      galleryHtml += '<div class="gcard">' +
+        '<div class="gimg"><img src="' + esc(u) + '" alt="" onerror="this.style.display=\'none\'" /></div>' +
+        '<div class="gacts">' +
+          '<button class="minibtn" data-iw="' + i + '">書き込む</button>' +
+          '<button class="minibtn" data-ix="' + i + '" style="color:#B5552F">削除</button>' +
+        "</div></div>";
+    });
+    galleryHtml += "</div>";
+  } else {
+    galleryHtml = '<div class="imgbox"><div class="placeholder">' +
+      '<div class="circle" style="background:' + c + '22;color:' + c + '">' +
+      esc(cur.item.slice(0,1)) + "</div><span>画像未登録</span></div></div>";
+  }
 
-  const statusHtml = status
-    ? `<div class="status ${status.type}">${status.msg}</div>` : "";
+  el.innerHTML =
+    '<div class="detail">' +
+      '<button class="back-btn" style="color:' + c + '" id="back">← 一覧に戻る</button>' +
+      '<div class="badges">' +
+        '<span class="badge" style="background:' + c + '22;color:' + c + '">' + esc(cur.category || "その他") + "</span>" +
+        [...cur.saleTypes].map(s => '<span class="badge plain">' + esc(s) + "</span>").join("") +
+      "</div>" +
+      galleryHtml +
+      (photos.length > 1 ? '<p class="meta" style="margin:-4px 0 10px">写真 ' + photos.length + " 枚</p>" : "") +
+      (status ? '<div class="status ' + status.type + '">' + esc(status.msg) + "</div>" : "") +
+      '<div class="btnrow">' +
+        '<button class="btn" id="ipick" style="background:' + c + (busy ? ";opacity:.6;pointer-events:none" : "") + '">' +
+          (busy ? "処理中..." : (photos.length ? "写真を追加" : "写真を選ぶ")) + "</button>" +
+        '<button class="btn outline" id="icam" style="color:' + c + (busy ? ";opacity:.6;pointer-events:none" : "") + '">カメラ</button>' +
+      "</div>" +
 
-  el.innerHTML = `
-    <div class="detail">
-      <button class="back-btn" style="color:${c}" id="back">← 一覧に戻る</button>
-      <div class="badges">
-        <span class="badge" style="background:${c}22;color:${c}">${cur.category || "その他"}</span>
-        ${[...cur.saleTypes].map(s => `<span class="badge plain">${s}</span>`).join("")}
-      </div>
-      <div class="imgbox">${imgHtml}</div>
-      ${statusHtml}
-      <label class="btn" style="background:${c};${busy ? "opacity:.6;pointer-events:none" : ""}">
-        ${busy ? "処理中..." : (images[cur.item] ? "写真を変更" : "写真を追加")}
-        <input type="file" accept="image/*" id="file" style="display:none" />
-      </label>
-      ${images[cur.item] ? `<button class="btn ghost" id="del">写真を削除</button>` : ""}
-      <h2 class="title">${cur.item}</h2>
-      <p class="meta">使用資材 ${cur.materials.length} 件 ・ 資材区分 ${byMat.size} 種類</p>
-      ${cur.memo ? `<div class="memo">${cur.memo}</div>` : ""}
-      ${matHtml}
-    </div>`;
+      '<h2 class="title">' + esc(cur.item) + "</h2>" +
+      '<p class="meta">使用資材 ' + cur.materials.length + " 件 ・ 資材区分 " + byMat.size + " 種類</p>" +
+      (cur.memo ? '<div class="memo">' + esc(cur.memo) + "</div>" : "") +
+      '<div class="addbar">' +
+        '<button class="minibtn" id="addmat" style="border-color:' + c + ';color:' + c + '">＋ 資材を追加</button>' +
+        '<button class="minibtn" id="edititem">品目を編集</button>' +
+        '<button class="minibtn" id="delitem" style="color:#B5552F">品目を削除</button>' +
+      "</div>" +
+      matHtml +
+    "</div>";
 
   const back = document.getElementById("back");
   if (back) back.onclick = () => {
     document.getElementById("sidebar").classList.remove("hidden");
     document.getElementById("main").classList.add("hidden");
   };
-  const f = document.getElementById("file");
-  if (f) f.onchange = e => handleFile(e.target.files[0]);
-  const d = document.getElementById("del");
-  if (d) d.onclick = removeImage;
+  document.getElementById("ipick").onclick = () => setPhoto("item", cur.item, false);
+  document.getElementById("icam").onclick = () => setPhoto("item", cur.item, true);
+  el.querySelectorAll("[data-iw]").forEach(b =>
+    b.onclick = () => annotateExisting("item", cur.item, Number(b.dataset.iw)));
+  el.querySelectorAll("[data-ix]").forEach(b =>
+    b.onclick = () => clearPhoto("item", cur.item, Number(b.dataset.ix)));
+
+  document.getElementById("addmat").onclick = () => materialFormModal(null);
+  document.getElementById("edititem").onclick = () => itemFormModal(cur.item);
+  document.getElementById("delitem").onclick = () => confirmModal(
+    "品目を削除", "「" + cur.item + "」と、その資材" + cur.materials.length + "件をすべて削除します。よろしいですか?",
+    async () => {
+      await withSave(async () => {
+        rows = rows.filter(r => r.item !== cur.item);
+        delete itemPhotos[cur.item];
+        selected = null;
+      }, "品目を削除しました");
+    });
+
+  el.querySelectorAll("[data-mp]").forEach(b => b.onclick = () => setPhoto("mat", b.dataset.mp, false));
+  el.querySelectorAll("[data-mc]").forEach(b => b.onclick = () => setPhoto("mat", b.dataset.mc, true));
+  el.querySelectorAll("[data-mw]").forEach(b => b.onclick = () => annotateExisting("mat", b.dataset.mw));
+  el.querySelectorAll("[data-mx]").forEach(b => b.onclick = () => clearPhoto("mat", b.dataset.mx));
+  el.querySelectorAll("[data-me]").forEach(b => b.onclick = () => {
+    const r = rows.find(x => x.id === b.dataset.me);
+    if (r) materialFormModal(r);
+  });
+  el.querySelectorAll("[data-md]").forEach(b => b.onclick = () => {
+    const r = rows.find(x => x.id === b.dataset.md);
+    if (!r) return;
+    confirmModal("資材を削除", "「" + r.material_name + "」を削除します。よろしいですか?", async () => {
+      await withSave(async () => {
+        rows = rows.filter(x => x.id !== r.id);
+      }, "資材を削除しました");
+    });
+  });
 }
 
-function render() { renderCats(); renderList(); renderDetail(); }
+function render() { renderCats(); renderList(); renderDetail(); renderModal(); }
 
 document.getElementById("search").addEventListener("input", e => { query = e.target.value; renderList(); });
 
+rows = SEED.slice();
+refreshItems();
 render();
-loadImages();
+loadAll();
 </script>
 </body>
 </html>
