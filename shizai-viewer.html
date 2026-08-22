@@ -1551,8 +1551,14 @@ function materialFormModal(existingRow, presetCat) {
   const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))];
   const usedHere = new Set(cur.materials.map(m => m.material_name));
   const reusable = existingRow ? [] : knownMaterials().filter(k => !usedHere.has(k.material_name));
+  const sharedWith = existingRow
+    ? knownMaterials().find(k => k.material_name === existingRow.material_name)
+    : null;
   openModal({
     title: existingRow ? "資材を編集" : "資材を追加",
+    message: (sharedWith && sharedWith.uses > 1)
+      ? "この資材は " + sharedWith.uses + " 品目で使われています。変更はすべてに反映されます。"
+      : "",
     picker: reusable,
     fields: [
       { key:"material_name", label:"資材名・型番", value: existingRow ? existingRow.material_name : "", required:true },
@@ -1568,15 +1574,32 @@ function materialFormModal(existingRow, presetCat) {
     ],
     onSubmit: async vals => {
       if (!vals.material_name.trim()) throw new Error("資材名を入力してください");
+      if (existingRow) {
+        const newName = vals.material_name.trim();
+        if (newName !== existingRow.material_name &&
+            knownMaterials().some(k => k.material_name === newName)) {
+          throw new Error("「" + newName + "」はすでにある資材です。別の名前にしてください。");
+        }
+      }
       await withSave(async () => {
         if (existingRow) {
-          Object.assign(existingRow, {
-            material_name: vals.material_name.trim(),
-            material_category: vals.material_category.trim() || "未分類",
-            supplier: vals.supplier.trim(),
-            common_or_dedicated: vals.common_or_dedicated.trim(),
-            sale_type: vals.sale_type.trim()
-          });
+          // A material is one shared thing, so editing it here updates every
+          // row carrying the same name. Only 販売区分 stays per-item, since
+          // that describes this item's use of it rather than the material.
+          const oldName = existingRow.material_name;
+          const newName = vals.material_name.trim();
+          for (const r of rows) {
+            if (r.material_name !== oldName) continue;
+            r.material_name = newName;
+            r.material_category = vals.material_category.trim() || "未分類";
+            r.supplier = vals.supplier.trim();
+            r.common_or_dedicated = vals.common_or_dedicated.trim();
+          }
+          existingRow.sale_type = vals.sale_type.trim();
+          if (oldName !== newName && matPhotos[oldName]) {
+            matPhotos[newName] = matPhotos[oldName];
+            delete matPhotos[oldName];
+          }
         } else {
           rows.push({
             id: newId(), item: cur.item, category: cur.category || "",
