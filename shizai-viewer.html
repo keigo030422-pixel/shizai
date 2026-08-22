@@ -2011,63 +2011,74 @@ function renderCats() {
     el.appendChild(edit);
   }
   const hiddenCount = [...itemMap.values()].filter(i => i.hidden).length;
+
+  // Multi-select is always available from the normal list, so items can be
+  // hidden (or brought back) without opening each one.
+  const pk = document.createElement("button");
+  pk.className = "cat-btn" + (picking ? " active" : "");
+  pk.textContent = picking ? "選択をやめる" : "☑ まとめて選ぶ";
+  if (picking) pk.style.background = "#3F7D4A";
+  pk.onclick = () => {
+    picking = !picking;
+    picked.clear();
+    arrangeCat = null;
+    if (picking) showHidden = true;   // so hidden ones can be ticked too
+    render();
+  };
+  el.appendChild(pk);
+
+  if (picking) {
+    const n = picked.size;
+    const hideAll = document.createElement("button");
+    hideAll.className = "cat-btn";
+    hideAll.textContent = "非表示にする (" + n + ")";
+    hideAll.style.borderColor = "#B5552F";
+    hideAll.style.color = "#B5552F";
+    hideAll.onclick = () => {
+      if (!n) { alert("非表示にしたい品目にチェックを入れてください。"); return; }
+      const names = [...picked];
+      withSave(async () => {
+        for (const nm of names) setHidden(nm, true);
+        picked.clear();
+      }, names.length + " 件を非表示にしました");
+    };
+    el.appendChild(hideAll);
+
+    const showAll = document.createElement("button");
+    showAll.className = "cat-btn";
+    showAll.textContent = "再表示する (" + n + ")";
+    showAll.style.borderColor = "#3F7D4A";
+    showAll.style.color = "#3F7D4A";
+    showAll.onclick = () => {
+      if (!n) { alert("再表示したい品目にチェックを入れてください。"); return; }
+      const names = [...picked];
+      withSave(async () => {
+        for (const nm of names) setHidden(nm, false);
+        picked.clear();
+      }, names.length + " 件を再表示しました");
+    };
+    el.appendChild(showAll);
+
+    const allBtn = document.createElement("button");
+    const visibleNow = filtered();
+    const allTicked = visibleNow.length && visibleNow.every(i => picked.has(i.item));
+    allBtn.className = "cat-btn";
+    allBtn.textContent = allTicked ? "選択を解除" : "表示中をすべて選ぶ";
+    allBtn.onclick = () => {
+      if (allTicked) picked.clear();
+      else visibleNow.forEach(i => picked.add(i.item));
+      render();
+    };
+    el.appendChild(allBtn);
+  }
+
   if (hiddenCount) {
     const t = document.createElement("button");
     t.className = "cat-btn" + (showHidden ? " active" : "");
     t.textContent = (showHidden ? "非表示を隠す" : "非表示も表示") + " (" + hiddenCount + ")";
     if (showHidden) t.style.background = "#8A8371";
-    t.onclick = () => {
-      showHidden = !showHidden;
-      if (!showHidden) { picking = false; picked.clear(); }
-      render();
-    };
+    t.onclick = () => { showHidden = !showHidden; render(); };
     el.appendChild(t);
-
-    // While hidden items are on screen, allow ticking several and restoring
-    // them in one go rather than opening each item in turn.
-    if (showHidden) {
-      const pk = document.createElement("button");
-      pk.className = "cat-btn" + (picking ? " active" : "");
-      pk.textContent = picking ? "選択をやめる" : "まとめて選ぶ";
-      if (picking) pk.style.background = "#3F7D4A";
-      pk.onclick = () => { picking = !picking; picked.clear(); render(); };
-      el.appendChild(pk);
-
-      if (picking) {
-        const n = picked.size;
-        const go = document.createElement("button");
-        go.className = "cat-btn";
-        go.textContent = "選んだ " + n + " 件を再表示";
-        go.style.borderColor = "#3F7D4A";
-        go.style.color = "#3F7D4A";
-        go.onclick = () => {
-          if (!n) { alert("再表示したい品目にチェックを入れてください。"); return; }
-          const names = [...picked];
-          withSave(async () => {
-            for (const nm of names) setHidden(nm, false);
-            picked.clear();
-            picking = false;
-          }, names.length + " 件を再表示しました");
-        };
-        el.appendChild(go);
-
-        const hideAll = document.createElement("button");
-        hideAll.className = "cat-btn";
-        hideAll.textContent = "選んだ " + n + " 件を非表示";
-        hideAll.style.borderColor = "#B5552F";
-        hideAll.style.color = "#B5552F";
-        hideAll.onclick = () => {
-          if (!n) { alert("非表示にしたい品目にチェックを入れてください。"); return; }
-          const names = [...picked];
-          withSave(async () => {
-            for (const nm of names) setHidden(nm, true);
-            picked.clear();
-            picking = false;
-          }, names.length + " 件を非表示にしました");
-        };
-        el.appendChild(hideAll);
-      }
-    }
   }
 
   const add = document.createElement("button");
@@ -2104,22 +2115,24 @@ function renderList() {
     byCat.get(c).push(i);
   }
   for (const [c, list] of byCat) {
-    const arranging = arrangeCat === c;
+    const arranging = !picking && arrangeCat === c;
     const h = document.createElement("div");
     h.className = "cat-head";
     h.style.color = color(c);
     h.innerHTML = '<span class="dot" style="background:' + color(c) + '"></span>' + esc(c);
-    const sortBtn = document.createElement("button");
-    sortBtn.className = "sortbtn";
-    sortBtn.textContent = arranging ? "並び替え終了" : "並び替え";
-    sortBtn.style.color = color(c);
-    sortBtn.style.borderColor = color(c);
-    sortBtn.onclick = e => {
-      e.stopPropagation();
-      arrangeCat = arranging ? null : c;
-      render();
-    };
-    h.appendChild(sortBtn);
+    if (!picking) {
+      const sortBtn = document.createElement("button");
+      sortBtn.className = "sortbtn";
+      sortBtn.textContent = arranging ? "並び替え終了" : "並び替え";
+      sortBtn.style.color = color(c);
+      sortBtn.style.borderColor = color(c);
+      sortBtn.onclick = e => {
+        e.stopPropagation();
+        arrangeCat = arranging ? null : c;
+        render();
+      };
+      h.appendChild(sortBtn);
+    }
     el.appendChild(h);
 
     const sorted = sortInCat(list);
