@@ -278,7 +278,8 @@ let modal = null;
 let pendingCats = [];   // categories created but with no items yet
 let view = "items";     // "items" | "materials"
 let showHidden = false; // reveal items marked hidden
-let arrangeCat = null;  // category currently being reordered
+let arrangeCat = null;  // item category currently being reordered
+let arrangeMatCat = null; // material category currently being reordered
 let picking = false;    // multi-select mode for showing/hiding in bulk
 let picked = new Set(); // item names ticked while picking
 let selectedMat = null; // material name shown in the master view
@@ -1380,14 +1381,30 @@ function knownMaterials() {
         material_category: r.material_category || "",
         supplier: r.supplier || "",
         common_or_dedicated: r.common_or_dedicated || "",
-        uses: 0
+        uses: 0,
+        morder: (typeof r.morder === "number") ? r.morder : null
       });
     }
     // Holder rows (no item) keep an unused material alive in the master, so
     // they must not count towards how many items use it.
     if (r.item) map.get(n).uses++;
+    if (typeof r.morder === "number" && map.get(n).morder == null) map.get(n).morder = r.morder;
   }
-  return [...map.values()].sort((a,b) => b.uses - a.uses || a.material_name.localeCompare(b.material_name, "ja"));
+  // Hand-placed materials come first in their set position; the rest keep the
+  // old "most used, then by name" ordering underneath.
+  return [...map.values()].sort((a, b) => {
+    const ao = a.morder == null ? Infinity : a.morder;
+    const bo = b.morder == null ? Infinity : b.morder;
+    if (ao !== bo) return ao - bo;
+    return b.uses - a.uses || a.material_name.localeCompare(b.material_name, "ja");
+  });
+}
+
+// Write positions back onto every row carrying each material name.
+function applyMatOrder(orderedNames) {
+  orderedNames.forEach((name, idx) => {
+    for (const r of rows) if (r.material_name === name) r.morder = idx;
+  });
 }
 
 // Editing from the master rewrites every row using this material, so the
@@ -1796,6 +1813,18 @@ function renderMatList() {
     ren.style.color = "#5A5648";
     ren.style.borderColor = "#D8D2C0";
     ren.onclick = e => { e.stopPropagation(); matCategoryModal(k); };
+    const arrangingM = arrangeMatCat === k;
+    const sortM = document.createElement("button");
+    sortM.className = "sortbtn";
+    sortM.textContent = arrangingM ? "並び替え終了" : "並び替え";
+    sortM.style.color = "#5A5648";
+    sortM.style.borderColor = "#D8D2C0";
+    sortM.onclick = e => {
+      e.stopPropagation();
+      arrangeMatCat = arrangingM ? null : k;
+      render();
+    };
+    h.appendChild(sortM);
     const addHere = document.createElement("button");
     addHere.className = "sortbtn";
     addHere.textContent = "＋この区分に追加";
@@ -1807,8 +1836,9 @@ function renderMatList() {
     el.appendChild(h);
     for (const m of list) {
       const b = document.createElement("button");
-      b.className = "item-btn";
-      if (selectedMat === m.material_name) {
+      b.className = "item-btn" + (arrangingM ? " dragrow" : "");
+      b.dataset.mat = m.material_name;
+      if (selectedMat === m.material_name && !arrangingM) {
         b.style.background = "#fff";
         b.style.color = "#2B2A24";
         b.style.fontWeight = "600";
@@ -1816,20 +1846,73 @@ function renderMatList() {
       }
       const ph = photoSrc(matPhotos[m.material_name]);
       const th = ph ? '<img class="thumb" src="' + esc(ph) + '" onerror="this.style.display=\'none\'" />' : "";
-      b.innerHTML = '<span class="left">' + th + esc(m.material_name) +
+      const grip = arrangingM ? '<span class="grip">☰</span>' : "";
+      b.innerHTML = '<span class="left">' + grip + th + esc(m.material_name) +
                     '</span><span class="count">' + m.uses + "</span>";
-      b.onclick = () => {
-        selectedMat = m.material_name;
-        status = null;
-        if (window.innerWidth < 768) {
-          document.getElementById("sidebar").classList.add("hidden");
-          document.getElementById("main").classList.remove("hidden");
-        }
-        render();
-      };
+      if (arrangingM) {
+        b.draggable = true;
+        attachMatDrag(b, el);
+      } else {
+        b.onclick = () => {
+          selectedMat = m.material_name;
+          status = null;
+          if (window.innerWidth < 768) {
+            document.getElementById("sidebar").classList.add("hidden");
+            document.getElementById("main").classList.remove("hidden");
+          }
+          render();
+        };
+      }
       el.appendChild(b);
     }
   }
+}
+
+// Same drag behaviour as the item list, but keyed on material names.
+function attachMatDrag(node, listEl) {
+  let dragging = false;
+
+  function rowsIn() { return [...listEl.querySelectorAll(".dragrow")]; }
+  function commit() {
+    const names = rowsIn().map(n => n.dataset.mat);
+    withSave(async () => { applyMatOrder(names); }, "並び順を保存しました");
+  }
+  function moveTo(clientY) {
+    const others = rowsIn().filter(n => n !== node);
+    for (const o of others) {
+      const r = o.getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) { listEl.insertBefore(node, o); return; }
+    }
+    const last = others[others.length - 1];
+    if (last) listEl.insertBefore(node, last.nextSibling);
+  }
+
+  node.addEventListener("dragstart", e => {
+    dragging = true;
+    node.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", node.dataset.mat); } catch (err) {}
+  });
+  node.addEventListener("dragover", e => e.preventDefault());
+  node.addEventListener("drag", e => { if (e.clientY) moveTo(e.clientY); });
+  node.addEventListener("dragend", () => {
+    node.classList.remove("dragging");
+    if (dragging) { dragging = false; commit(); }
+  });
+
+  let touching = false;
+  node.addEventListener("touchstart", () => { touching = true; node.classList.add("dragging"); }, { passive:true });
+  node.addEventListener("touchmove", e => {
+    if (!touching) return;
+    e.preventDefault();
+    moveTo(e.touches[0].clientY);
+  }, { passive:false });
+  node.addEventListener("touchend", () => {
+    if (!touching) return;
+    touching = false;
+    node.classList.remove("dragging");
+    commit();
+  });
 }
 
 function renderMatDetail() {
@@ -2339,6 +2422,8 @@ function switchView(v) {
   view = v;
   query = "";
   status = null;
+  arrangeCat = null;
+  arrangeMatCat = null;
   const s = document.getElementById("search");
   if (s) s.value = "";
   // back to the list pane on phones, since the detail may not apply any more
