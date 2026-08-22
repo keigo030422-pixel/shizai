@@ -1385,6 +1385,31 @@ function knownMaterials() {
 
 // Editing from the master rewrites every row using this material, so the
 // change is reflected in all the items that use it.
+// Material categories are just a field on the rows, so renaming one means
+// rewriting every material that carries it.
+function matCategoryModal(cat) {
+  const count = knownMaterials().filter(m => (m.material_category || "未分類") === cat).length;
+  const others = [...new Set(rows.map(r => r.material_category).filter(Boolean))]
+    .filter(x => x !== cat);
+  openModal({
+    title: "資材区分の名前を変更",
+    message: "「" + cat + "」の資材 " + count + " 件すべてに反映されます。",
+    fields: [
+      { key:"name", label:"区分名", value: cat, list: others, required:true }
+    ],
+    onSubmit: async vals => {
+      const name = vals.name.trim();
+      if (!name) throw new Error("区分名を入力してください");
+      if (name === cat) return;
+      await withSave(async () => {
+        for (const r of rows) {
+          if ((r.material_category || "未分類") === cat) r.material_category = name;
+        }
+      }, "区分名を変更しました");
+    }
+  });
+}
+
 function masterMaterialModal(info) {
   const matCats = [...new Set(rows.map(r => r.material_category).filter(Boolean))];
   const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))];
@@ -1677,6 +1702,13 @@ function renderMatList() {
     h.className = "cat-head";
     h.style.color = "#5A5648";
     h.innerHTML = '<span class="dot" style="background:#8A8371"></span>' + esc(k);
+    const ren = document.createElement("button");
+    ren.className = "sortbtn";
+    ren.textContent = "区分名を変更";
+    ren.style.color = "#5A5648";
+    ren.style.borderColor = "#D8D2C0";
+    ren.onclick = e => { e.stopPropagation(); matCategoryModal(k); };
+    h.appendChild(ren);
     el.appendChild(h);
     for (const m of list) {
       const b = document.createElement("button");
