@@ -225,7 +225,12 @@
         <button id="tabitems" class="vtab active">品目から見る</button>
         <button id="tabmats" class="vtab">資材マスタ</button>
       </div>
-      <button id="showbin" class="minibtn" style="margin-top:6px">保存先IDを表示</button>
+      <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap">
+        <button id="dobackup" class="minibtn">バックアップを保存</button>
+        <button id="dorestore" class="minibtn">復元</button>
+        <button id="showbin" class="minibtn">保存先IDを表示</button>
+      </div>
+      <input id="restorefile" type="file" accept="application/json,.json" style="display:none" />
       <p id="binout" style="margin-top:5px; font-family:monospace; font-size:11px;
          word-break:break-all; color:#3F7D4A"></p>
     </div>
@@ -2571,6 +2576,74 @@ document.getElementById("tabmats").addEventListener("click", () => switchView("m
 document.getElementById("search").addEventListener("input", e => {
   query = e.target.value;
   if (view === "materials") renderMatList(); else renderList();
+});
+
+// Everything lives in a single online bin, so an accidental delete is
+// otherwise unrecoverable. This writes the whole dataset out as a file the
+// user keeps, and can read one back in.
+document.getElementById("dobackup").addEventListener("click", () => {
+  try {
+    const payload = {
+      savedAt: new Date().toISOString(),
+      binId: BIN_ID,
+      rows: rows,
+      itemPhotos: itemPhotos,
+      matPhotos: matPhotos
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "shizai-backup-" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) +
+                 "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const n = [...itemMap.values()].length;
+    document.getElementById("binout").textContent =
+      "バックアップを保存しました(品目 " + n + " 件 / 資材 " + knownMaterials().length + " 件)";
+  } catch (e) {
+    console.error(e);
+    document.getElementById("binout").textContent = "バックアップに失敗しました: " + e.message;
+  }
+});
+
+document.getElementById("dorestore").addEventListener("click", () => {
+  if (!confirm("バックアップから復元すると、今のデータはすべて置き換わります。よろしいですか?")) return;
+  document.getElementById("restorefile").click();
+});
+
+document.getElementById("restorefile").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    let data;
+    try { data = JSON.parse(r.result); }
+    catch (err) {
+      document.getElementById("binout").textContent = "このファイルは読み込めませんでした。";
+      return;
+    }
+    if (!data || !Array.isArray(data.rows)) {
+      document.getElementById("binout").textContent = "バックアップの中身が正しくありません。";
+      return;
+    }
+    const when = data.savedAt ? new Date(data.savedAt).toLocaleString("ja-JP") : "日時不明";
+    if (!confirm(when + " のバックアップ(" + data.rows.length + " 行)で上書きします。よろしいですか?")) return;
+    withSave(async () => {
+      rows = data.rows;
+      itemPhotos = data.itemPhotos || {};
+      matPhotos = data.matPhotos || {};
+      migratePhotos();
+      selected = null;
+      selectedMat = null;
+    }, "バックアップから復元しました");
+  };
+  r.readAsText(file);
 });
 
 document.getElementById("showbin").addEventListener("click", () => {
